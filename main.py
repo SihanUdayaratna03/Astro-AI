@@ -59,7 +59,7 @@ async def rag_ingest_pdf(ctx: inngest.Context):
 )
 async def rag_query_pdf_ai(ctx: inngest.Context):
     def _search(question: str, top_k: int = 5) -> RAGSearchResult:
-        query_vec = embed_texts([question])[0]
+        query_vec = embed_texts([question], task_type="RETRIEVAL_QUERY")[0]
         store = QdrantStorage()
         found = store.search(query_vec, top_k)
         return RAGSearchResult(contexts=found["contexts"], sources=found["sources"])
