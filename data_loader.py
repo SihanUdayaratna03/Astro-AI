@@ -10,7 +10,7 @@ load_dotenv()
 # Configure Gemini client with new SDK
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-EMBED_MODEL = "models/text-embedding-004"
+EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIM = 3072  # gemini-embedding-001 outputs 3072-dimensional vectors
 
 splitter = SentenceSplitter(chunk_size=1000, chunk_overlap=200)
