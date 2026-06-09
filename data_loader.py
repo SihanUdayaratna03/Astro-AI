@@ -26,14 +26,14 @@ def load_and_chunk_pdf(path: str) -> list[str]:
     return chunks
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
+def embed_texts(texts: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
     """Embed a list of texts using Gemini's embedding model."""
     embeddings = []
     for text in texts:
         response = client.models.embed_content(
             model=EMBED_MODEL,
             contents=text,
-            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+            config=types.EmbedContentConfig(task_type=task_type),
         )
         embeddings.append(response.embeddings[0].values)
     return embeddings
