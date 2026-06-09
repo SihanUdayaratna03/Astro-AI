@@ -96,8 +96,12 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
                 )
                 return response.text.strip()
             except Exception as e:
-                last_err = e
-        raise RuntimeError(f"All models failed. Last error: {last_err}")
+                err_str = str(e)
+                if "429" in err_str or "404" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
+                    last_err = e
+                    continue
+                raise
+        raise RuntimeError(f"All models exhausted or unavailable. Last error: {last_err}")
 
     answer = await ctx.step.run("llm-answer", lambda: _generate_answer(user_content))
     return {"answer": answer, "sources": found.sources, "num_contexts": len(found.contexts)}
