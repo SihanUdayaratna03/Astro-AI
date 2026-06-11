@@ -254,78 +254,102 @@ html, body,
 
 /* ══ WIDGET OVERRIDES ═══════════════════════════════════════════════════════ */
 
-/* File uploader */
+/* File uploader — outer wrapper */
 [data-testid="stFileUploader"] {
-    background: rgba(255,255,255,0.012) !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-    border-radius: 8px !important;
+    background: rgba(255,255,255,0.025) !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    border-radius: 10px !important;
     transition: border-color 0.25s ease, background 0.25s ease !important;
 }
 
 [data-testid="stFileUploader"]:hover {
-    border-color: rgba(255,255,255,0.14) !important;
-    background: rgba(255,255,255,0.022) !important;
+    border-color: rgba(255,255,255,0.28) !important;
+    background: rgba(255,255,255,0.04) !important;
 }
 
+/* All text inside the file uploader dropzone */
 [data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] *,
 [data-testid="stFileUploader"] span,
+[data-testid="stFileUploader"] small,
 [data-testid="stFileUploader"] p {
-    color: #2d3548 !important;
+    color: #8090a8 !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.82rem !important;
+    font-size: 0.85rem !important;
+}
+
+/* The "Browse files" button inside uploader */
+[data-testid="stFileUploaderDropzone"] button {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 6px !important;
+    color: #c0cce0 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    padding: 0.45rem 1.1rem !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button:hover {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: rgba(255,255,255,0.3) !important;
+    color: #ffffff !important;
 }
 
 [data-testid="stFileUploaderDropzone"] {
-    padding: 1.5rem !important;
+    padding: 2rem 1.5rem !important;
 }
 
 /* Text input */
 [data-testid="stTextInput"] input {
-    background: rgba(255,255,255,0.02) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.16) !important;
     border-radius: 8px !important;
     color: #e0e8ff !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.92rem !important;
+    font-size: 0.93rem !important;
     font-weight: 400 !important;
     caret-color: #ffffff !important;
-    transition: border-color 0.2s ease !important;
-    padding: 0.7rem 0.9rem !important;
+    transition: border-color 0.2s ease, background 0.2s ease !important;
+    padding: 0.75rem 1rem !important;
 }
 
 [data-testid="stTextInput"] input:focus {
-    border-color: rgba(255,255,255,0.22) !important;
-    box-shadow: none !important;
+    border-color: rgba(255,255,255,0.35) !important;
+    background: rgba(255,255,255,0.06) !important;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.04) !important;
     outline: none !important;
 }
 
 [data-testid="stTextInput"] input::placeholder {
-    color: #1e2535 !important;
+    color: #4a5a78 !important;
+    font-style: normal !important;
 }
 
 /* Number input */
 [data-testid="stNumberInput"] input {
-    background: rgba(255,255,255,0.02) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.16) !important;
     border-radius: 8px !important;
-    color: #c0c8d8 !important;
+    color: #c0cce0 !important;
     font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.85rem !important;
+    font-size: 0.88rem !important;
     text-align: center !important;
 }
 
 /* Number input arrows */
 [data-testid="stNumberInput"] button {
-    background: transparent !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-    color: #2d3548 !important;
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #8090a8 !important;
     border-radius: 6px !important;
 }
 
 [data-testid="stNumberInput"] button:hover {
-    border-color: rgba(255,255,255,0.15) !important;
-    color: #c0c8d8 !important;
-    background: rgba(255,255,255,0.04) !important;
+    border-color: rgba(255,255,255,0.28) !important;
+    color: #e0e8ff !important;
+    background: rgba(255,255,255,0.08) !important;
 }
 
 /* Primary submit button */
@@ -372,7 +396,7 @@ html, body,
 
 /* Spinner */
 [data-testid="stSpinner"] p {
-    color: #2d3548 !important;
+    color: #6a7a9a !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.75rem !important;
     letter-spacing: 0.05em !important;
@@ -382,11 +406,12 @@ html, body,
 label,
 [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] label {
-    color: #6a7a9a !important;
-    font-size: 0.72rem !important;
+    color: #8090a8 !important;
+    font-size: 0.7rem !important;
     font-family: 'JetBrains Mono', monospace !important;
-    letter-spacing: 0.1em !important;
+    letter-spacing: 0.12em !important;
     text-transform: uppercase !important;
+    margin-bottom: 0.4rem !important;
 }
 
 /* Alerts */
