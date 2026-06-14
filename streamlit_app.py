@@ -854,7 +854,7 @@ with col_l:
         </div>
         <div class="pipeline-step">
             <span class="step-index">05</span>
-            <span class="step-text">Gemini synthesizes answer from retrieved context</span>
+            <span class="step-text">Supervisor Agent routes query to Document Retriever or Calculation Agents and synthesizes response</span>
         </div>
     </div>
     """, unsafe_allow_html=True)

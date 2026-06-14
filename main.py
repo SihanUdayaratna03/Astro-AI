@@ -57,54 +57,35 @@ async def rag_ingest_pdf(ctx: inngest.Context):
     trigger=inngest.TriggerEvent(event="rag/query_pdf_ai")
 )
 async def rag_query_pdf_ai(ctx: inngest.Context):
-    def _search(question: str, top_k: int = 5) -> RAGSearchResult:
-        query_vec = embed_texts([question], task_type="RETRIEVAL_QUERY")[0]
-        store = QdrantStorage()
-        found = store.search(query_vec, top_k)
-        return RAGSearchResult(contexts=found["contexts"], sources=found["sources"])
-
     question = ctx.event.data["question"]
-    top_k = int(ctx.event.data.get("top_k", 5))
 
-    found = await ctx.step.run("embed-and-search", lambda: _search(question, top_k), output_type=RAGSearchResult)
+    def _run_langgraph(q: str):
+        from agents import app
+        from langchain_core.messages import HumanMessage
+        
+        initial_state = {
+            "messages": [
+                {"role": "system", "content": "You are a helpful AI assistant. Use tools to search documents or perform calculations if needed. Answer concisely."},
+                HumanMessage(content=q)
+            ],
+            "sources": [],
+            "num_contexts": 0
+        }
+        
+        result = app.invoke(initial_state)
+        
+        final_message = result["messages"][-1].content
+        sources = result.get("sources", [])
+        num_contexts = result.get("num_contexts", 0)
+        
+        return {
+            "answer": final_message,
+            "sources": sources,
+            "num_contexts": num_contexts
+        }
 
-    context_block = "\n\n".join(f"- {c}" for c in found.contexts)
-    user_content = (
-        "Use the following context to answer the question.\n\n"
-        f"Context:\n{context_block}\n\n"
-        f"Question: {question}\n"
-        "Answer concisely using the context above."
-    )
-
-    def _generate_answer(user_content: str) -> str:
-        from data_loader import client
-        models_to_try = [
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash-lite",
-        ]
-        last_err = None
-        for model_name in models_to_try:
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[
-                        "You answer questions using only the provided context.",
-                        user_content
-                    ],
-                    config={"temperature": 0.2, "max_output_tokens": 1024}
-                )
-                return response.text.strip()
-            except Exception as e:
-                err_str = str(e)
-                if "429" in err_str or "404" in err_str or "RESOURCE_EXHAUSTED" in err_str or "NOT_FOUND" in err_str:
-                    last_err = e
-                    continue
-                raise
-        raise RuntimeError(f"All models exhausted or unavailable. Last error: {last_err}")
-
-    answer = await ctx.step.run("llm-answer", lambda: _generate_answer(user_content))
-    return {"answer": answer, "sources": found.sources, "num_contexts": len(found.contexts)}
+    output = await ctx.step.run("run-langgraph-agent", lambda: _run_langgraph(question))
+    return output
 
 
 app = FastAPI()
