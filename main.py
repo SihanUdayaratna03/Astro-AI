@@ -3,6 +3,13 @@ from fastapi import FastAPI
 import inngest
 import inngest.fast_api
 from dotenv import load_dotenv
+
+import socket
+old_getaddrinfo = socket.getaddrinfo
+def new_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    return [r for r in responses if r[0] == socket.AF_INET]
+socket.getaddrinfo = new_getaddrinfo
 import uuid
 import os
 import datetime
@@ -60,6 +67,8 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
     question = ctx.event.data["question"]
 
     def _run_langgraph(q: str):
+        import signal
+        import threading
         from agents import app
         from langchain_core.messages import HumanMessage
         
@@ -75,6 +84,13 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
         result = app.invoke(initial_state)
         
         final_message = result["messages"][-1].content
+        if isinstance(final_message, list):
+            text_blocks = [block["text"] for block in final_message if isinstance(block, dict) and "text" in block]
+            text_blocks += [block for block in final_message if isinstance(block, str)]
+            final_message = "\n".join(text_blocks)
+        elif not isinstance(final_message, str):
+            final_message = str(final_message)
+            
         sources = result.get("sources", [])
         num_contexts = result.get("num_contexts", 0)
         

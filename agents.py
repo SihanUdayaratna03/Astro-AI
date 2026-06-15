@@ -47,14 +47,40 @@ tool_node = ToolNode(tools)
 if "GEMINI_API_KEY" in os.environ and "GOOGLE_API_KEY" not in os.environ:
     os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
-# Initialize model
-model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
+# Initialize models with fallback chain
+MODELS = ["gemini-2.0-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash-lite"]
+
+def _create_model(model_name: str):
+    return ChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=0.2,
+        timeout=60,
+        max_retries=2,
+    )
+
+model = _create_model(MODELS[0])
 model_with_tools = model.bind_tools(tools)
 
 def call_model(state: AgentState):
     messages = state["messages"]
-    response = model_with_tools.invoke(messages)
-    return {"messages": [response]}
+    last_error = None
+    for model_name in MODELS:
+        try:
+            m = _create_model(model_name).bind_tools(tools)
+            response = m.invoke(messages)
+            return {"messages": [response]}
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            if "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str:
+                print(f"Model {model_name} quota exhausted, trying next...")
+                continue
+            elif "404" in err_str or "not found" in err_str or "not_found" in err_str:
+                print(f"Model {model_name} not found/supported, trying next...")
+                continue
+            else:
+                raise
+    raise last_error
 
 def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     messages = state["messages"]
