@@ -1,6 +1,6 @@
 # AI RAG Assistant
 
-A robust Retrieval-Augmented Generation (RAG) assistant built with **Streamlit**, **FastAPI**, **Inngest**, **Qdrant**, and the **Google Gemini API**. It processes PDF documents, stores their embeddings in a vector database, and uses an LLM to answer questions strictly based on the provided context.
+A robust Retrieval-Augmented Generation (RAG) assistant built with **React**, **FastAPI**, **Inngest**, **Qdrant**, and the **Google Gemini API**. It processes PDF documents, stores their embeddings in a vector database, and uses an LLM to answer questions strictly based on the provided context.
 
 ## 🏗️ Architecture
 
@@ -16,19 +16,20 @@ graph TD
     classDef database fill:#673ab7,stroke:#fff,stroke-width:2px,color:#fff
 
     %% Nodes
-    UI[Streamlit Frontend]:::frontend
+    UI[React Frontend]:::frontend
     API[FastAPI Backend]:::backend
     Inngest[Inngest Dev Server]:::orchestration
     Qdrant[(Qdrant Vector DB)]:::database
     Gemini[Google Gemini API]:::extAPI
 
     %% Flow
-    UI -- "1. Upload PDF" --> Inngest
-    UI -- "2. Ask Question" --> Inngest
-    
-    Inngest -- "Trigger Job" --> API
+    UI -- "1. Upload / Query" --> API
+    API -- "2. Dispatch Event" --> Inngest
+    UI -- "3. Poll Status" --> API
+    API -- "4. Check Runs" --> Inngest
     
     subgraph Inngest Background Jobs
+        Inngest -- "Execute Step" --> API
         API -- "Extract Text & Chunk" --> Chunking[Sentence Splitter]
         Chunking -- "Generate Embeddings" --> Gemini
         Gemini -- "Save Vectors" --> Qdrant
@@ -39,8 +40,6 @@ graph TD
     end
 
     Gemini -- "Return Answer" --> API
-    API -- "Job Complete" --> Inngest
-    Inngest -- "Display Output" --> UI
 ```
 
 ## 🚀 How to Run Locally
@@ -65,17 +64,18 @@ Inngest acts as the orchestrator to manage and retry background jobs reliably.
 npx inngest-cli@latest dev -u http://localhost:8000/api/inngest
 ```
 
-### 4. Start the Streamlit Frontend
-This serves the user interface.
+### 4. Start the React Frontend
+This serves the new user interface.
 ```bash
-uv run streamlit run streamlit_app.py
+cd frontend
+npm run dev
 ```
 
 ---
 
 ## 🎯 Usage
 
-1. Navigate to **http://localhost:8501** in your browser.
+1. Navigate to **http://localhost:5173** in your browser.
 2. Expand the sidebar to **upload a PDF**. Wait for the green success message.
 3. In the main chat area, **ask a question** about the PDF you just uploaded.
 4. The system will retrieve the most relevant chunks and generate an answer using Gemini.
