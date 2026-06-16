@@ -1,5 +1,9 @@
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import shutil
+import requests
 import inngest
 import inngest.fast_api
 from dotenv import load_dotenv
@@ -13,6 +17,7 @@ socket.getaddrinfo = new_getaddrinfo
 import uuid
 import os
 import datetime
+from pathlib import Path
 from data_loader import load_and_chunk_pdf, embed_texts
 from vector_db import QdrantStorage
 from custom_types import RAQQueryResult, RAGSearchResult, RAGUpsertResult, RAGChunkAndSrc
@@ -105,4 +110,65 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 inngest.fast_api.serve(app, inngest_client, [rag_ingest_pdf, rag_query_pdf_ai])
+
+class QueryRequest(BaseModel):
+    question: str
+
+@app.post("/api/upload")
+async def upload_pdf(file: UploadFile = File(...)):
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+    
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / file.filename
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    res = await inngest_client.send(inngest.Event(
+        name="rag/ingest_pdf",
+        data={"pdf_path": str(file_path.resolve()), "source_id": file.filename},
+    ))
+    
+    return {"event_id": res[0].id, "message": "File uploaded and processing started."}
+
+@app.post("/api/query")
+async def query_pdf(req: QueryRequest):
+    res = await inngest_client.send(inngest.Event(
+        name="rag/query_pdf_ai",
+        data={"question": req.question},
+    ))
+    return {"event_id": res[0].id, "message": "Query processing started."}
+
+def _api_base() -> str:
+    return os.getenv("INNGEST_API_BASE", "http://127.0.0.1:8288/v1")
+
+@app.get("/api/status/{event_id}")
+def get_event_status(event_id: str):
+    try:
+        r = requests.get(f"{_api_base()}/events/{event_id}/runs")
+        r.raise_for_status()
+        runs = r.json().get("data", [])
+        if not runs:
+            return {"status": "pending"}
+        run = runs[0]
+        status = run.get("status", "").lower()
+        if status in ("completed", "succeeded", "success", "finished"):
+            return {"status": "completed", "output": run.get("output") or {}}
+        elif status in ("failed", "cancelled"):
+            return {"status": "failed", "error": run.get("error")}
+        else:
+            return {"status": status}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
