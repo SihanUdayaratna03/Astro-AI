@@ -1,3 +1,5 @@
+![AstroRAG Assistant](screenshot.png)
+
 # AI RAG Assistant
 
 A robust Retrieval-Augmented Generation (RAG) assistant built with **React**, **FastAPI**, **Inngest**, **Qdrant**, and the **Google Gemini API**. It processes PDF documents, stores their embeddings in a vector database, and uses an LLM to answer questions strictly based on the provided context.
