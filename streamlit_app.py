@@ -714,17 +714,18 @@ label,
 def get_inngest_client() -> inngest.Inngest:
     return inngest.Inngest(app_id="rag_app", is_production=False)
 
-def save_uploaded_pdf(file) -> Path:
+def save_uploaded_file(file) -> Path:
+    """Save any uploaded file (PDF or image) to the uploads directory."""
     p = Path("uploads")
     p.mkdir(parents=True, exist_ok=True)
     fp = p / file.name
     fp.write_bytes(file.getbuffer())
     return fp
 
-async def _send_ingest(pdf_path: Path) -> None:
+async def _send_ingest(file_path: Path) -> None:
     await get_inngest_client().send(inngest.Event(
-        name="rag/ingest_pdf",
-        data={"pdf_path": str(pdf_path.resolve()), "source_id": pdf_path.name},
+        name="rag/ingest_document",
+        data={"pdf_path": str(file_path.resolve()), "source_id": file_path.name},
     ))
 
 async def _send_query(question: str, top_k: int):
@@ -787,14 +788,15 @@ st.markdown("""
 # ══ HERO ══════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="hero">
-    <div class="hero-kicker">// Document Intelligence Platform</div>
+    <div class="hero-kicker">// Multimodal Document Intelligence Platform</div>
     <h1 class="hero-h1">
         Ask anything.<br>
-        <strong>From your documents.</strong>
+        <strong>From any document or image.</strong>
     </h1>
     <p class="hero-p">
-        Upload your PDFs into a semantic vector store. Query them in natural language.
-        Receive precise, source-grounded answers powered by Gemini.
+        Upload PDFs or images into a semantic vector store. Text is extracted from images
+        via Gemini Vision OCR. Query everything in natural language and receive
+        precise, source-grounded answers.
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -806,37 +808,56 @@ col_l, col_r = st.columns([1, 1.08], gap="large")
 with col_l:
     st.markdown("""
     <div class="section-label">01 — Upload</div>
-    <div class="section-title">Ingest Document</div>
-    <div class="section-desc">Upload a PDF to chunk, embed, and index it into the vector store.</div>
+    <div class="section-title">Ingest Document or Image</div>
+    <div class="section-desc">Upload a PDF or an image (PNG, JPG, WEBP). Images are processed via Gemini Vision OCR before indexing.</div>
     """, unsafe_allow_html=True)
 
+    IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+
     uploaded = st.file_uploader(
-        "Select a PDF file",
-        type=["pdf"],
+        "Select a PDF or Image file",
+        type=["pdf", "png", "jpg", "jpeg", "webp"],
         accept_multiple_files=False,
         label_visibility="visible",
     )
 
     if uploaded is not None:
+        import pathlib as _pl
         size_kb = round(len(uploaded.getbuffer()) / 1024, 1)
+        ext = _pl.Path(uploaded.name).suffix.lower().lstrip(".")
+        is_image = ext in IMAGE_EXTENSIONS
+
+        if is_image:
+            # Show a live thumbnail for images
+            st.image(uploaded, use_container_width=True)
+            file_type_label = ext.upper()
+            file_type_desc = "OCR via Gemini Vision"
+        else:
+            file_type_label = "PDF"
+            file_type_desc = "Text extraction &amp; chunking"
+
         st.markdown(f"""
         <div class="file-card">
-            <div class="file-card-icon">PDF</div>
+            <div class="file-card-icon">{file_type_label}</div>
             <div>
                 <div class="file-card-name">{uploaded.name}</div>
-                <div class="file-card-meta">{size_kb} KB &nbsp;&middot;&nbsp; Ready to ingest</div>
+                <div class="file-card-meta">{size_kb} KB &nbsp;&middot;&nbsp; {file_type_desc}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("Ingest into vector store", use_container_width=True):
-            with st.spinner("Chunking and embedding document..."):
-                path = save_uploaded_pdf(uploaded)
+        btn_label = "Extract text &amp; ingest" if is_image else "Ingest into vector store"
+        spinner_msg = "Running OCR and embedding image..." if is_image else "Chunking and embedding document..."
+        success_verb = "OCR &amp; ingestion" if is_image else "Ingestion"
+
+        if st.button(btn_label if not is_image else "Extract text & ingest", use_container_width=True):
+            with st.spinner(spinner_msg):
+                path = save_uploaded_file(uploaded)
                 asyncio.run(_send_ingest(path))
                 time.sleep(0.4)
             st.markdown(f"""
             <div class="inline-alert alert-success">
-                Ingestion complete &mdash; <strong>{uploaded.name}</strong> is now indexed and searchable.
+                {success_verb} complete &mdash; <strong>{uploaded.name}</strong> is now indexed and searchable.
             </div>
             """, unsafe_allow_html=True)
 
@@ -845,23 +866,27 @@ with col_l:
         <div class="pipeline-header">Pipeline</div>
         <div class="pipeline-step">
             <span class="step-index">01</span>
-            <span class="step-text">PDF parsed and split into overlapping semantic chunks</span>
+            <span class="step-text">File type detected &mdash; PDF or Image routed accordingly</span>
         </div>
         <div class="pipeline-step">
             <span class="step-index">02</span>
-            <span class="step-text">Each chunk embedded via Gemini text-embedding model</span>
+            <span class="step-text">Images: Gemini Vision OCR extracts all text, tables &amp; diagrams</span>
         </div>
         <div class="pipeline-step">
             <span class="step-index">03</span>
-            <span class="step-text">Vectors upserted into Qdrant with metadata payload</span>
+            <span class="step-text">Extracted text split into overlapping semantic chunks</span>
         </div>
         <div class="pipeline-step">
             <span class="step-index">04</span>
-            <span class="step-text">Query embedded and matched by cosine similarity</span>
+            <span class="step-text">Each chunk embedded via Gemini text-embedding model</span>
         </div>
         <div class="pipeline-step">
             <span class="step-index">05</span>
-            <span class="step-text">Supervisor Agent routes query to Document Retriever or Calculation Agents and synthesizes response</span>
+            <span class="step-text">Vectors upserted into Qdrant with source metadata</span>
+        </div>
+        <div class="pipeline-step">
+            <span class="step-index">06</span>
+            <span class="step-text">LangGraph agent retrieves top-K contexts and synthesizes a grounded answer</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -955,6 +980,8 @@ with col_r:
             <span class="chip">Summarize this document</span>
             <span class="chip">What are the main conclusions?</span>
             <span class="chip">List all key terms</span>
+            <span class="chip">What does the image say?</span>
+            <span class="chip">Extract all numbers from the image</span>
             <span class="chip">What methodology was used?</span>
         </div>
     </div>
@@ -964,7 +991,7 @@ with col_r:
 # ══ FOOTER ════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="footer">
-    <div class="footer-brand">AstroRAG &nbsp;&middot;&nbsp; Document Intelligence</div>
-    <div class="footer-stack">Gemini &nbsp;&middot;&nbsp; Qdrant &nbsp;&middot;&nbsp; Inngest</div>
+    <div class="footer-brand">AstroRAG &nbsp;&middot;&nbsp; Multimodal Document Intelligence</div>
+    <div class="footer-stack">Gemini Vision OCR &nbsp;&middot;&nbsp; Qdrant &nbsp;&middot;&nbsp; Inngest &nbsp;&middot;&nbsp; LangGraph</div>
 </div>
 """, unsafe_allow_html=True)

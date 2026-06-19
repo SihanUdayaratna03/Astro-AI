@@ -18,9 +18,12 @@ import uuid
 import os
 import datetime
 from pathlib import Path
-from data_loader import load_and_chunk_pdf, embed_texts
+from data_loader import load_and_chunk_pdf, load_and_chunk_image, get_file_type, embed_texts
 from vector_db import QdrantStorage
 from custom_types import RAQQueryResult, RAGSearchResult, RAGUpsertResult, RAGChunkAndSrc
+
+# Accepted upload extensions (for the /api/upload endpoint)
+ACCEPTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
 load_dotenv()
 
@@ -32,10 +35,11 @@ inngest_client = inngest.Inngest(
 )
 
 @inngest_client.create_function(
-    fn_id="RAG: Ingest PDF",
-    trigger=inngest.TriggerEvent(event="rag/ingest_pdf"),
+    fn_id="RAG: Ingest Document",
+    # Accepts both the new generic event name AND the legacy PDF event name
+    trigger=inngest.TriggerEvent(event="rag/ingest_document"),
     throttle=inngest.Throttle(
-        limit=2, period=datetime.timedelta(minutes=1)  # ✅ Fixed: count → limit
+        limit=2, period=datetime.timedelta(minutes=1)
     ),
     rate_limit=inngest.RateLimit(
         limit=1,
@@ -43,11 +47,19 @@ inngest_client = inngest.Inngest(
         key="event.data.source_id",
     ),
 )
-async def rag_ingest_pdf(ctx: inngest.Context):
+async def rag_ingest_document(ctx: inngest.Context):
     def _load(ctx: inngest.Context) -> RAGChunkAndSrc:
-        pdf_path = ctx.event.data["pdf_path"]
-        source_id = ctx.event.data.get("source_id", pdf_path)
-        chunks = load_and_chunk_pdf(pdf_path)
+        file_path = ctx.event.data["pdf_path"]  # key kept for compatibility
+        source_id = ctx.event.data.get("source_id", file_path)
+        file_type = get_file_type(file_path)
+
+        if file_type == "pdf":
+            chunks = load_and_chunk_pdf(file_path)
+        elif file_type == "image":
+            chunks = load_and_chunk_image(file_path)
+        else:
+            raise ValueError(f"Unsupported file type for path: {file_path}")
+
         return RAGChunkAndSrc(chunks=chunks, source_id=source_id)
 
     def _upsert(chunks_and_src: RAGChunkAndSrc) -> RAGUpsertResult:
@@ -119,29 +131,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-inngest.fast_api.serve(app, inngest_client, [rag_ingest_pdf, rag_query_pdf_ai])
+inngest.fast_api.serve(app, inngest_client, [rag_ingest_document, rag_query_pdf_ai])
 
 class QueryRequest(BaseModel):
     question: str
 
 @app.post("/api/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
-    
+async def upload_document(file: UploadFile = File(...)):
+    """Accepts PDF and image files (PNG, JPG, JPEG, WEBP). Triggers OCR and ingestion."""
+    import pathlib
+    ext = pathlib.Path(file.filename).suffix.lower()
+    if ext not in ACCEPTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted types: {', '.join(ACCEPTED_EXTENSIONS)}"
+        )
+
     upload_dir = Path("uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
     file_path = upload_dir / file.filename
-    
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
+
     res = await inngest_client.send(inngest.Event(
-        name="rag/ingest_pdf",
+        name="rag/ingest_document",
         data={"pdf_path": str(file_path.resolve()), "source_id": file.filename},
     ))
-    
-    return {"event_id": res[0].id, "message": "File uploaded and processing started."}
+
+    file_type = "image" if ext != ".pdf" else "pdf"
+    return {
+        "event_id": res[0].id,
+        "message": f"{'Image' if file_type == 'image' else 'PDF'} uploaded — OCR and ingestion started.",
+        "file_type": file_type,
+        "filename": file.filename,
+    }
 
 @app.post("/api/query")
 async def query_pdf(req: QueryRequest):
@@ -171,4 +195,62 @@ def get_event_status(event_id: str):
         else:
             return {"status": status}
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": str(e)}
+
+
+# ── OCR Scan: immediate Gemini Vision text extraction ─────────────────────────
+IMAGE_OCR_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
+@app.post("/api/ocr-scan")
+async def ocr_scan_image(file: UploadFile = File(...)):
+    """
+    Performs immediate OCR on an uploaded image using Gemini Vision and returns
+    the full extracted text. Simultaneously fires a background Inngest event to
+    embed and index the text in Qdrant so the user can ask questions about it.
+    """
+    import pathlib as _pl
+    import asyncio
+
+    file_ext = _pl.Path(file.filename).suffix.lower()
+    if file_ext not in IMAGE_OCR_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expected an image file (PNG, JPG, JPEG, WEBP). Got '{file_ext}'.",
+        )
+
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / file.filename
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Run Gemini Vision OCR in a thread (synchronous SDK call)
+    try:
+        chunks = await asyncio.to_thread(load_and_chunk_image, str(file_path))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
+
+    if not chunks:
+        raise HTTPException(
+            status_code=422,
+            detail="No text could be extracted from this image. Try a clearer image.",
+        )
+
+    extracted_text = "\n\n".join(chunks)
+
+    # Trigger background embedding + Qdrant ingestion via Inngest
+    res = await inngest_client.send(inngest.Event(
+        name="rag/ingest_document",
+        data={"pdf_path": str(file_path.resolve()), "source_id": file.filename},
+    ))
+
+    return {
+        "extracted_text": extracted_text,
+        "char_count": len(extracted_text),
+        "chunk_count": len(chunks),
+        "event_id": res[0].id,
+        "filename": file.filename,
+        "message": "OCR complete. Background ingestion started.",
+    }
+
