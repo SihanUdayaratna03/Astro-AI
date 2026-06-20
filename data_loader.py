@@ -6,7 +6,7 @@ from llama_index.readers.file import PDFReader
 from llama_index.core.node_parser import SentenceSplitter
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Configure Gemini client with new SDK
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))

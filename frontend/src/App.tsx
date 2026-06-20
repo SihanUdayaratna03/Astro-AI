@@ -29,7 +29,7 @@ interface ScanFile {
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════════
-const API = 'http://localhost:8001/api';
+const API = 'http://127.0.0.1:8000/api';
 const IMG_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
 const PDF_CHIPS = [

@@ -25,7 +25,7 @@ from custom_types import RAQQueryResult, RAGSearchResult, RAGUpsertResult, RAGCh
 # Accepted upload extensions (for the /api/upload endpoint)
 ACCEPTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
-load_dotenv()
+load_dotenv(override=True)
 
 inngest_client = inngest.Inngest(
     app_id="rag_app",
@@ -38,14 +38,6 @@ inngest_client = inngest.Inngest(
     fn_id="RAG: Ingest Document",
     # Accepts both the new generic event name AND the legacy PDF event name
     trigger=inngest.TriggerEvent(event="rag/ingest_document"),
-    throttle=inngest.Throttle(
-        limit=2, period=datetime.timedelta(minutes=1)
-    ),
-    rate_limit=inngest.RateLimit(
-        limit=1,
-        period=datetime.timedelta(hours=4),
-        key="event.data.source_id",
-    ),
 )
 async def rag_ingest_document(ctx: inngest.Context):
     def _load(ctx: inngest.Context) -> RAGChunkAndSrc:
@@ -131,7 +123,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-inngest.fast_api.serve(app, inngest_client, [rag_ingest_document, rag_query_pdf_ai])
+inngest.fast_api.serve(app, inngest_client, [rag_ingest_document, rag_query_pdf_ai], serve_origin="http://127.0.0.1:8000")
 
 class QueryRequest(BaseModel):
     question: str
@@ -161,7 +153,7 @@ async def upload_document(file: UploadFile = File(...)):
 
     file_type = "image" if ext != ".pdf" else "pdf"
     return {
-        "event_id": res[0].id,
+        "event_id": res[0],
         "message": f"{'Image' if file_type == 'image' else 'PDF'} uploaded — OCR and ingestion started.",
         "file_type": file_type,
         "filename": file.filename,
@@ -173,7 +165,7 @@ async def query_pdf(req: QueryRequest):
         name="rag/query_pdf_ai",
         data={"question": req.question},
     ))
-    return {"event_id": res[0].id, "message": "Query processing started."}
+    return {"event_id": res[0], "message": "Query processing started."}
 
 def _api_base() -> str:
     return os.getenv("INNGEST_API_BASE", "http://127.0.0.1:8288/v1")
@@ -249,7 +241,7 @@ async def ocr_scan_image(file: UploadFile = File(...)):
         "extracted_text": extracted_text,
         "char_count": len(extracted_text),
         "chunk_count": len(chunks),
-        "event_id": res[0].id,
+        "event_id": res[0],
         "filename": file.filename,
         "message": "OCR complete. Background ingestion started.",
     }
