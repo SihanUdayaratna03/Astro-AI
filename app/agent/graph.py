@@ -6,8 +6,8 @@ from langgraph.prebuilt import ToolNode
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
 
-from vector_db import QdrantStorage
-from data_loader import embed_texts
+from app.services.vector_db import QdrantStorage
+from app.services.data_loader import embed_texts
 
 class AgentState(MessagesState):
     sources: List[str]
@@ -48,7 +48,7 @@ if "GEMINI_API_KEY" in os.environ and "GOOGLE_API_KEY" not in os.environ:
     os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
 # Initialize models with fallback chain
-MODELS = ["gemini-2.0-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash-lite"]
+MODELS = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.5-flash"]
 
 def _create_model(model_name: str):
     return ChatGoogleGenerativeAI(
@@ -74,9 +74,13 @@ def call_model(state: AgentState):
             err_str = str(e).lower()
             if "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str:
                 print(f"Model {model_name} quota exhausted, trying next...")
+                last_error = Exception(f"Google API Quota Exhausted (Rate Limit). Please wait a minute or check your billing plan. Details: {e}")
                 continue
             elif "404" in err_str or "not found" in err_str or "not_found" in err_str:
                 print(f"Model {model_name} not found/supported, trying next...")
+                continue
+            elif "403" in err_str or "permission" in err_str:
+                print(f"Model {model_name} permission denied, trying next...")
                 continue
             else:
                 raise

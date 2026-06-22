@@ -14,7 +14,7 @@ socket.getaddrinfo = new_getaddrinfo
 
 def test_run():
     print("Starting test...")
-    from agents import app
+    from app.agent.graph import app
     from langchain_core.messages import HumanMessage
 
     initial_state = {

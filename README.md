@@ -57,13 +57,13 @@ docker run -p 6333:6333 qdrant/qdrant
 ### 2. Start the FastAPI Backend
 This serves the API endpoints that Inngest uses to execute background jobs.
 ```bash
-uv run uvicorn main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ### 3. Start the Inngest Dev Server
 Inngest acts as the orchestrator to manage and retry background jobs reliably.
 ```bash
-npx inngest-cli@latest dev -u http://localhost:8000/api/inngest
+npx inngest-cli@latest dev -u http://127.0.0.1:8000/api/inngest
 ```
 
 ### 4. Start the React Frontend

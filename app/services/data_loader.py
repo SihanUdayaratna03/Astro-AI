@@ -8,11 +8,23 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-# Configure Gemini client with new SDK
+# Configure Gemini client (used for OCR/generation, NOT embeddings)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-EMBED_MODEL = "gemini-embedding-001"
-EMBED_DIM = 3072  # gemini-embedding-001 outputs 3072-dimensional vectors
+# Local sentence-transformers embedding model — no API key needed, no quota limits.
+# all-MiniLM-L6-v2 produces 384-dimensional vectors and is fast on CPU.
+EMBED_DIM = 384
+
+_embedder = None
+
+def _get_embedder():
+    """Lazy-load the sentence-transformers model on first use."""
+    global _embedder
+    if _embedder is None:
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedder
+
 
 # Supported image MIME types for OCR
 IMAGE_MIME_TYPES = {
@@ -67,7 +79,7 @@ def load_and_chunk_image(path: str) -> list[str]:
         "Return ONLY the extracted content — no commentary, no preamble."
     )
 
-    MODELS = ["gemini-2.0-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash-lite"]
+    MODELS = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.5-flash"]
     last_error = None
     response = None
 
@@ -86,9 +98,13 @@ def load_and_chunk_image(path: str) -> list[str]:
             err_str = str(e).lower()
             if "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str:
                 print(f"Model {model_name} quota exhausted or rate limited, trying next...")
+                last_error = Exception(f"Google API Quota Exhausted (Rate Limit). Please wait a minute or check your billing plan. Details: {e}")
                 continue
             elif "404" in err_str or "not found" in err_str or "not_found" in err_str:
                 print(f"Model {model_name} not found, trying next...")
+                continue
+            elif "403" in err_str or "permission" in err_str:
+                print(f"Model {model_name} permission denied, trying next...")
                 continue
             else:
                 raise
@@ -101,19 +117,16 @@ def load_and_chunk_image(path: str) -> list[str]:
     if not extracted_text:
         return []
 
-    # Split the extracted text into chunks for embedding
     chunks = splitter.split_text(extracted_text)
     return chunks
 
 
 def embed_texts(texts: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
-    """Embed a list of texts using Gemini's embedding model."""
-    embeddings = []
-    for text in texts:
-        response = client.models.embed_content(
-            model=EMBED_MODEL,
-            contents=text,
-            config=types.EmbedContentConfig(task_type=task_type),
-        )
-        embeddings.append(response.embeddings[0].values)
-    return embeddings
+    """Embed texts using local sentence-transformers (all-MiniLM-L6-v2, 384-dim).
+    
+    This runs fully locally — no API key or quota needed.
+    The task_type parameter is accepted for API compatibility but not used.
+    """
+    model = _get_embedder()
+    vectors = model.encode(texts, convert_to_numpy=True)
+    return [v.tolist() for v in vectors]
