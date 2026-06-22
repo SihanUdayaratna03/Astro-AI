@@ -4,6 +4,8 @@ import {
   Zap, Cpu, Loader2, Image as ImageIcon, FileText, ScanText, Sparkles,
   X, Copy, Check, Camera, BookOpen,
 } from 'lucide-react';
+import Landing from './Landing';
+import BlurText from './BlurText';
 import './index.css';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -68,13 +70,26 @@ async function pollStatus(eventId: string): Promise<any> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // TOPBAR
 // ═══════════════════════════════════════════════════════════════════════════════
-const Topbar: React.FC = () => (
+const Topbar: React.FC<{ onBackToLanding: () => void }> = ({ onBackToLanding }) => (
   <header className="topbar">
-    <div className="topbar-logo">
-      AstroRAG <div className="logo-dot" />
-      <span style={{ fontWeight: 300, opacity: 0.5, letterSpacing: '0.08em' }}>AI</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      <button 
+        onClick={onBackToLanding} 
+        style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-secondary)', padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', transition: 'all 0.2s' }}
+        onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+        onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+        title="Back to Landing Page"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Landing
+      </button>
+      <div className="topbar-logo">
+        Astro <div className="logo-dot" />
+        <span style={{ fontWeight: 300, opacity: 0.5, letterSpacing: '0.08em' }}>AI</span>
+      </div>
     </div>
     <div className="topbar-badges">
       <div className="status-badge"><Database size={11} /> Qdrant <div className="status-dot" /></div>
@@ -371,47 +386,29 @@ const ScanningView: React.FC<{ preview: string }> = ({ preview }) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 const HeroDocuments: React.FC<{ onChip: (q: string) => void }> = ({ onChip }) => (
   <div className="hero-empty">
-    <div className="hero-kicker">// Document Intelligence</div>
-    <h1 className="hero-h1">Ask anything.<br /><strong>From your documents.</strong></h1>
-    <p className="hero-p">Upload a PDF in the sidebar, ingest it, then ask natural language questions to get precise, source-grounded answers powered by Gemini.</p>
-    <div className="hero-chips">
-      {PDF_CHIPS.map(q => <button key={q} className="chip" onClick={() => onChip(q)}>{q}</button>)}
-    </div>
-    <div className="hero-icons">
-      <div className="hero-icon-item">
-        <div className="hero-icon-box"><FileText size={17} /></div>
-        <span className="hero-icon-label">PDF</span>
-      </div>
-      <div className="hero-icon-item">
-        <div className="hero-icon-box"><Sparkles size={17} /></div>
-        <span className="hero-icon-label">RAG</span>
-      </div>
-    </div>
+    <div className="hero-kicker">// Image Scanner</div>
+    <BlurText
+      text="Ask anything. From your documents."
+      delay={50}
+      animateBy="words"
+      direction="top"
+      className="hero-h1"
+    />
+    <p className="hero-p">Upload a PDF in the sidebar, ingest it, then ask natural language questions to get precise, source-grounded answers.</p>
   </div>
 );
 
 const HeroScan: React.FC<{ onChip: (q: string) => void }> = ({ onChip }) => (
   <div className="hero-empty">
-    <div className="hero-kicker ocr">// Gemini Vision OCR</div>
-    <h1 className="hero-h1">Scan any image.<br /><strong>Ask about the content.</strong></h1>
-    <p className="hero-p">Upload a photo, screenshot, handwritten note, or any image. Gemini Vision will extract all visible text and let you ask questions about it.</p>
-    <div className="hero-chips">
-      {SCAN_CHIPS.map(q => <button key={q} className="chip scan" onClick={() => onChip(q)}>{q}</button>)}
-    </div>
-    <div className="hero-icons">
-      <div className="hero-icon-item">
-        <div className="hero-icon-box ocr"><Camera size={17} /></div>
-        <span className="hero-icon-label ocr">IMAGE</span>
-      </div>
-      <div className="hero-icon-item">
-        <div className="hero-icon-box ocr"><ScanText size={17} /></div>
-        <span className="hero-icon-label ocr">OCR</span>
-      </div>
-      <div className="hero-icon-item">
-        <div className="hero-icon-box ocr"><ImageIcon size={17} /></div>
-        <span className="hero-icon-label ocr">Q&A</span>
-      </div>
-    </div>
+    <div className="hero-kicker ocr">// Image Scanner</div>
+    <BlurText
+      text="Scan any image. Ask about the content."
+      delay={50}
+      animateBy="words"
+      direction="top"
+      className="hero-h1"
+    />
+    <p className="hero-p">Upload a photo, screenshot, handwritten note, or any image. The system will extract all visible text and let you ask questions about it.</p>
   </div>
 );
 
@@ -450,6 +447,8 @@ const MsgBubble: React.FC<{ msg: Message }> = ({ msg }) => (
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
+  const [hasStarted, setHasStarted] = useState(false);
+
   // ── Tab ──────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('pdf');
 
@@ -618,12 +617,18 @@ export default function App() {
       : 'Ask about the extracted image content...';
 
   // ── RENDER ────────────────────────────────────────────────────────────────────
+  if (!hasStarted) {
+    return <Landing onStart={() => setHasStarted(true)} />;
+  }
+
   return (
     <div className="app-shell">
       <div className="starfield" />
       <div className="shooting-star" />
+      <div className="glow-orb top-left" />
+      <div className="glow-orb bottom-right" />
 
-      <Topbar />
+      <Topbar onBackToLanding={() => setHasStarted(false)} />
 
       <div className="main-content">
         {/* ── SIDEBAR ── */}
@@ -680,7 +685,7 @@ export default function App() {
           {showScanningAnim && <ScanningView preview={scanFile.preview} />}
 
           {/* Messages / Hero */}
-          {!showScanningAnim && (
+          {!showScanningAnim && !showScanResult && (
             hasMessages ? (
               <div className="messages-wrap">
                 {messages.map(m => <MsgBubble key={m.id} msg={m} />)}
@@ -688,11 +693,9 @@ export default function App() {
                 <div ref={messagesEndRef} />
               </div>
             ) : (
-              !showScanResult && (
-                activeTab === 'pdf'
-                  ? <HeroDocuments onChip={handleChipClick} />
-                  : <HeroScan onChip={handleChipClick} />
-              )
+              activeTab === 'pdf'
+                ? <HeroDocuments onChip={handleChipClick} />
+                : <HeroScan onChip={handleChipClick} />
             )
           )}
 
@@ -705,27 +708,28 @@ export default function App() {
             </div>
           )}
 
-          {/* Input bar — always visible at bottom */}
+          {/* Input bar — floating pill style */}
           {!showScanningAnim && (
-            <div className="input-bar">
-              <div className="input-row">
-                <textarea
-                  ref={textareaRef}
-                  className="chat-ta"
-                  placeholder={inputPlaceholder}
-                  value={inputValue}
-                  onChange={handleTextareaChange}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  disabled={!canQuery}
-                  rows={1}
-                />
-                <button className="send-btn" onClick={handleSend} disabled={!canSend}>
-                  {isQuerying ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
-                </button>
-              </div>
-              <div className="input-hint">
-                Enter to send · Shift+Enter for new line ·{' '}
-                {activeTab === 'pdf' ? 'Document RAG' : 'Photo OCR + RAG'} powered by Gemini
+            <div className="input-bar-container">
+              <div className="input-bar">
+                <div className="input-row">
+                  <textarea
+                    ref={textareaRef}
+                    className="chat-ta"
+                    placeholder={inputPlaceholder}
+                    value={inputValue}
+                    onChange={handleTextareaChange}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    disabled={!canQuery}
+                    rows={1}
+                  />
+                  <button className="send-btn" onClick={handleSend} disabled={!canSend}>
+                    {isQuerying ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
+                  </button>
+                </div>
+                <div className="input-hint">
+                  Enter to send · Shift+Enter for new line
+                </div>
               </div>
             </div>
           )}
