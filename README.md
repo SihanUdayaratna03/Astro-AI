@@ -86,6 +86,36 @@ graph TD
 3. **Tool Invocation:** If the LLM decides it needs context, it calls the `search_document` tool. The tool embeds the query, searches Qdrant, and returns the top relevant paragraphs and their source filenames.
 4. **Synthesis:** The LLM receives the tool's output, updates its internal context, and loops back to step 2. Once it has enough information, it synthesizes the final grounded answer and stops calling tools.
 
+## 📸 OCR Workflow (Image Processing)
+
+When a user uploads an image instead of a PDF, the system seamlessly extracts the text using Gemini's multimodal capabilities before passing it into the standard embedding pipeline.
+
+```mermaid
+graph TD
+    %% Define Styles
+    classDef frontend fill:#ff4b4b,stroke:#fff,stroke-width:2px,color:#fff
+    classDef backend fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
+    classDef extAPI fill:#4285f4,stroke:#fff,stroke-width:2px,color:#fff
+    classDef localAI fill:#f39c12,stroke:#fff,stroke-width:2px,color:#fff
+    classDef database fill:#673ab7,stroke:#fff,stroke-width:2px,color:#fff
+
+    %% Nodes
+    Upload((Upload Image)):::frontend
+    FastAPI[FastAPI Backend]:::backend
+    GeminiVision[Gemini Vision API<br>OCR Extraction]:::extAPI
+    Chunking[Sentence Splitter]:::backend
+    SentenceTransformer[Local Embeddings]:::localAI
+    Qdrant[(Qdrant Vector DB)]:::database
+
+    %% Flow
+    Upload --> FastAPI
+    FastAPI -- "Send Image Bytes" --> GeminiVision
+    GeminiVision -- "Return Raw Text" --> FastAPI
+    FastAPI --> Chunking
+    Chunking -- "Generate Vectors" --> SentenceTransformer
+    SentenceTransformer -- "Save Vectors" --> Qdrant
+```
+
 ## 🚀 How to Run Locally
 
 You will need to open **three separate terminals** to run all the microservices required for this project.
