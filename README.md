@@ -43,6 +43,49 @@ graph TD
     API -- "Return Answer" --> UI
 ```
 
+## 🤖 Agent Workflow
+
+When a user asks a question, the system delegates the task to a **LangGraph Agent**. The agent acts as an orchestrator, deciding whether it needs to search the database or perform calculations before answering the user.
+
+```mermaid
+graph TD
+    %% Define Styles
+    classDef state fill:#34495e,stroke:#fff,stroke-width:2px,color:#fff
+    classDef model fill:#4285f4,stroke:#fff,stroke-width:2px,color:#fff
+    classDef tools fill:#e67e22,stroke:#fff,stroke-width:2px,color:#fff
+
+    %% Nodes
+    Start((User Query))
+    State[AgentState<br>Messages, Sources, Contexts]:::state
+    LLM[Gemini LLM<br>Reasoning Engine]:::model
+    ShouldContinue{Tool Call<br>Required?}
+    
+    subgraph Tools Node
+        ToolNode[Execute Tools]:::tools
+        Search[search_document<br>Queries Qdrant DB]:::tools
+        Calc[calculate_expression<br>Math Evaluation]:::tools
+        
+        ToolNode --> Search
+        ToolNode --> Calc
+    end
+    
+    End((Final Answer))
+
+    %% Flow
+    Start --> State
+    State --> LLM
+    LLM --> ShouldContinue
+    ShouldContinue -- "Yes (Call Tool)" --> ToolNode
+    ToolNode -- "Update State" --> LLM
+    ShouldContinue -- "No (Answer Ready)" --> End
+```
+
+**How the Agent Works:**
+1. **Initialize State:** The agent receives the user's question and initializes a state tracking all messages, sources, and context counts.
+2. **Model Evaluation:** The Gemini LLM analyzes the question and determines if it needs more information to answer it accurately.
+3. **Tool Invocation:** If the LLM decides it needs context, it calls the `search_document` tool. The tool embeds the query, searches Qdrant, and returns the top relevant paragraphs and their source filenames.
+4. **Synthesis:** The LLM receives the tool's output, updates its internal context, and loops back to step 2. Once it has enough information, it synthesizes the final grounded answer and stops calling tools.
+
 ## 🚀 How to Run Locally
 
 You will need to open **three separate terminals** to run all the microservices required for this project.
