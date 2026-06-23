@@ -35,8 +35,8 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       </main>
 
       {/* Footer */}
-      <footer className="landing-footer" style={{ position: 'absolute', bottom: '2rem', width: '100%', textAlign: 'center' }}>
-        Powered by React, FastAPI, Qdrant & Gemini
+      <footer className="landing-footer" style={{ position: 'absolute', bottom: '2rem', width: '100%', textAlign: 'center', color: 'white' }}>
+        Astro AI Assistant
       </footer>
     </div>
   );
