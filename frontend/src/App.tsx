@@ -3,7 +3,7 @@ import {
   UploadCloud, Send, Bot, User, CheckCircle2, AlertCircle, Database,
   Zap, Cpu, Loader2, Image as ImageIcon, FileText, ScanText, Sparkles,
   X, Copy, Check, Camera, BookOpen, Download, Trash2, ArrowDown,
-  Layout, List, Map, Maximize, Minimize
+  Layout, List, Map, Maximize, Minimize, Mic, MicOff
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import Landing from './Landing';
@@ -153,11 +153,55 @@ export default function App() {
   const [isQuerying, setIsQuerying] = useState(false);
   const [canQuery, setCanQuery] = useState(messages.length > 0);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   
   const hasMessages = messages.length > 0;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // @ts-ignore
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onstart = () => setIsListening(true);
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue((prev) => (prev ? prev + ' ' : '') + transcript);
+      };
+      recognitionRef.current.onerror = (event: any) => {
+        if (event.error !== 'no-speech') {
+          console.error('Speech recognition error', event.error);
+        }
+        setIsListening(false);
+      };
+      recognitionRef.current.onend = () => setIsListening(false);
+    }
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      alert('Voice recognition is not supported in your browser. Please use Chrome or Edge.');
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.error('Speech recognition start error', e);
+        setIsListening(false);
+      }
+    }
+  };
 
   useEffect(() => { localStorage.setItem('astro_messages', JSON.stringify(messages)); }, [messages]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isQuerying]);
@@ -356,6 +400,15 @@ export default function App() {
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   disabled={!canQuery} rows={1}
                 />
+                <button 
+                  className={`send-btn ${isListening ? 'listening' : ''}`} 
+                  onClick={toggleVoiceInput} 
+                  disabled={!canQuery}
+                  title="Voice Input"
+                  style={{ background: isListening ? 'rgba(239, 68, 68, 0.2)' : 'transparent', color: isListening ? '#ef4444' : 'var(--text-secondary)' }}
+                >
+                  {isListening ? <Mic className="pulse-anim" size={15} /> : <MicOff size={15} />}
+                </button>
                 <button className="send-btn" onClick={handleSend} disabled={!canQuery || !inputValue.trim()}>
                   {isQuerying ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
                 </button>

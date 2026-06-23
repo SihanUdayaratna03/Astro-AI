@@ -772,3 +772,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text-secon
   from { opacity: 0; transform: translate(-50%, -80%); }
   to { opacity: 1; transform: translate(-50%, -100%); }
 }
+
+
+@keyframes pulse-red { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+.pulse-anim { animation: pulse-red 1.5s infinite ease-in-out; }
