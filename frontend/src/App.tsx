@@ -50,6 +50,49 @@ const STORAGE_KEY = 'astro_conversations';
 const ACTIVE_KEY = 'astro_active_conversation_id';
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ASTRO AI MODEL REGISTRY
+// To add a new model in the future, simply add a new entry to this array.
+// ═══════════════════════════════════════════════════════════════════════════════
+export interface AstroModel {
+  id: string;          // sent to the backend
+  name: string;        // short display name
+  fullName: string;    // full brand name shown in selector
+  tagline: string;     // one-line description
+  badge?: string;      // optional pill label
+  isDefault?: boolean;
+  isDisabled?: boolean;
+}
+
+export const ASTRO_MODELS: AstroModel[] = [
+  {
+    id: 'nova',
+    name: 'Nova',
+    fullName: 'Astro AI Nova',
+    tagline: 'Fast & lightweight — ideal for quick lookups',
+    badge: 'DEFAULT',
+    isDefault: true,
+  },
+  {
+    id: 'pulsar',
+    name: 'Pulsar',
+    fullName: 'Astro AI Pulsar',
+    tagline: 'Balanced · Recommended for most tasks',
+    badge: 'COMING SOON',
+    isDisabled: true,
+  },
+  {
+    id: 'quasar',
+    name: 'Quasar',
+    fullName: 'Astro AI Quasar',
+    tagline: 'Most powerful · Deep reasoning & analysis',
+    badge: 'COMING SOON',
+    isDisabled: true,
+  },
+];
+
+const DEFAULT_MODEL = ASTRO_MODELS.find(m => m.isDefault) ?? ASTRO_MODELS[1];
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════════
 const getExt = (name: string) => name.slice(name.lastIndexOf('.')).toLowerCase();
@@ -104,6 +147,74 @@ async function pollStatus(eventId: string): Promise<any> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MODEL SELECTOR
+// ═══════════════════════════════════════════════════════════════════════════════
+interface ModelSelectorProps {
+  selected: AstroModel;
+  onChange: (m: AstroModel) => void;
+}
+
+const ModelSelector: React.FC<ModelSelectorProps> = ({ selected, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="model-selector" ref={ref}>
+      <button
+        className={`model-selector-trigger ${open ? 'open' : ''}`}
+        onClick={() => setOpen(v => !v)}
+        title="Switch Astro AI model"
+      >
+        <span className="model-trigger-name">{selected.fullName}</span>
+        {selected.badge && <span className="model-badge">{selected.badge}</span>}
+        <svg className={`model-chevron ${open ? 'flipped' : ''}`} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      {open && (
+        <div className="model-dropdown">
+          <div className="model-dropdown-header">Select model</div>
+          {ASTRO_MODELS.map(m => (
+            <button
+              key={m.id}
+              className={`model-option ${m.id === selected.id ? 'active' : ''} ${m.isDisabled ? 'disabled' : ''}`}
+              disabled={m.isDisabled}
+              onClick={() => { if (!m.isDisabled) { onChange(m); setOpen(false); } }}
+            >
+              <div className="model-option-left">
+                <div className="model-option-icon">
+                  {m.id === 'nova'   && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>}
+                  {m.id === 'pulsar' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h3M19 12h3M12 2v3M12 19v3"/></svg>}
+                  {m.id === 'quasar' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="m9 12 2 2 4-4"/><circle cx="19" cy="5" r="3"/></svg>}
+                </div>
+                <div>
+                  <div className="model-option-name">{m.fullName}</div>
+                  <div className="model-option-tagline">{m.tagline}</div>
+                </div>
+              </div>
+              <div className="model-option-right">
+                {m.badge && <span className={`model-badge ${m.isDisabled ? 'disabled' : ''}`}>{m.badge}</span>}
+                {m.id === selected.id && !m.isDisabled && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CONTEXT MENU (Highlighting)
 // ═══════════════════════════════════════════════════════════════════════════════
 const ContextMenu: React.FC<{ menu: any, onAction: (a: string) => void }> = ({ menu, onAction }) => {
@@ -125,9 +236,11 @@ interface TopbarProps {
   onNewChat: () => void;
   onToggleHistory: () => void;
   historyOpen: boolean;
+  selectedModel: AstroModel;
+  onModelChange: (m: AstroModel) => void;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen }) => (
+const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, selectedModel, onModelChange }) => (
   <header className="topbar">
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <button
@@ -145,6 +258,7 @@ const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHis
         <span style={{ fontWeight: 300, opacity: 0.5, letterSpacing: '0.08em' }}>AI</span>
       </div>
     </div>
+
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
       <div className="topbar-badges">
         <div className="status-badge"><Database size={11} /> Qdrant <div className="status-dot" /></div>
@@ -637,6 +751,21 @@ const MsgBubble: React.FC<{ msg: Message }> = ({ msg }) => {
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
 
+  // ── Selected Astro AI model (persists in localStorage) ────────────────────
+  const [selectedModel, setSelectedModel] = useState<AstroModel>(() => {
+    const saved = localStorage.getItem('astro_selected_model');
+    if (saved) {
+      const found = ASTRO_MODELS.find(m => m.id === saved);
+      if (found) return found;
+    }
+    return DEFAULT_MODEL;
+  });
+
+  const handleModelChange = (m: AstroModel) => {
+    setSelectedModel(m);
+    localStorage.setItem('astro_selected_model', m.id);
+  };
+
   // ── Tab ──────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('pdf');
 
@@ -997,7 +1126,7 @@ export default function App() {
     try {
       const res = await fetch(`${API}/query`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, model: selectedModel.id }),
       });
       if (!res.ok) throw new Error('Query failed');
       const data = await res.json();
@@ -1041,6 +1170,8 @@ export default function App() {
           onNewChat={handleNewChat}
           onToggleHistory={() => setHistoryOpen(v => !v)}
           historyOpen={historyOpen}
+          selectedModel={selectedModel}
+          onModelChange={handleModelChange}
         />
       )}
 
@@ -1151,6 +1282,9 @@ export default function App() {
           {!showScanningAnim && (
             <div className="input-bar-container">
               <div className="input-bar">
+                <div style={{ display: 'flex', marginBottom: '8px', paddingLeft: '8px' }}>
+                  <ModelSelector selected={selectedModel} onChange={handleModelChange} />
+                </div>
                 <div className="input-row">
                   <textarea
                     ref={textareaRef}

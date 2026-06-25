@@ -2,6 +2,7 @@ import os
 import time
 from typing import Literal, TypedDict, List
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.prebuilt import ToolNode
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -48,8 +49,8 @@ tool_node = ToolNode(tools)
 if "GEMINI_API_KEY" in os.environ and "GOOGLE_API_KEY" not in os.environ:
     os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
-# Prioritise newer, faster models first; older ones as safe fallback
-MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+# Full fallback chain used when the primary model fails
+FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
 
 def _create_model(model_name: str):
     return ChatGoogleGenerativeAI(
@@ -59,13 +60,17 @@ def _create_model(model_name: str):
         max_retries=2,
     )
 
-model = _create_model(MODELS[0])
+model = _create_model(FALLBACK_MODELS[0])
 model_with_tools = model.bind_tools(tools)
 
-def call_model(state: AgentState):
+def call_model(state: AgentState, config: RunnableConfig):
     messages = state["messages"]
+    # The primary model is set by the caller via config; fall back through the chain if it fails.
+    primary = config.get("configurable", {}).get("gemini_model", FALLBACK_MODELS[0])
+    # Build an ordered list: requested model first, then any remaining fallbacks that differ
+    ordered = [primary] + [m for m in FALLBACK_MODELS if m != primary]
     last_error = None
-    for idx, model_name in enumerate(MODELS):
+    for idx, model_name in enumerate(ordered):
         try:
             m = _create_model(model_name).bind_tools(tools)
             response = m.invoke(messages)

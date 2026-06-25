@@ -90,12 +90,27 @@ async def _ingest_document(job_id: str, file_path: str, source_id: str):
         _save_job(job_id, {"status": "failed", "output": None, "error": str(e)})
 
 
+# ── Astro AI model → Gemini model mapping ──────────────────────────────────
+# Adding a new Astro AI model in the future only requires adding an entry here.
+ASTRO_MODEL_MAP: dict[str, str] = {
+    "nova":   "gemini-1.5-flash",    # Astro AI Nova   — fast, lightweight
+    "pulsar": "gemini-2.0-flash",    # Astro AI Pulsar — balanced (default)
+    "quasar": "gemini-1.5-pro",      # Astro AI Quasar — powerful, deep reasoning
+}
+DEFAULT_ASTRO_MODEL = "nova"
+
+
 # ── Background task: answer a question via LangGraph RAG ───────────────────
-async def _query_rag(job_id: str, question: str):
+async def _query_rag(job_id: str, question: str, astro_model: str = DEFAULT_ASTRO_MODEL):
     _save_job(job_id, {"status": "running", "output": None, "error": None})
     try:
         from app.agent.graph import app as langgraph_app
         from langchain_core.messages import HumanMessage
+
+        # Resolve the Astro model name to the underlying Gemini model ID.
+        # Unknown names fall back to the default Pulsar model.
+        gemini_model = ASTRO_MODEL_MAP.get(astro_model, ASTRO_MODEL_MAP[DEFAULT_ASTRO_MODEL])
+        logger.info(f"[Job {job_id}] Astro model='{astro_model}' → Gemini model='{gemini_model}'")
 
         initial_state = {
             "messages": [
@@ -106,8 +121,11 @@ async def _query_rag(job_id: str, question: str):
             "num_contexts": 0,
         }
 
+        # Pass the chosen Gemini model name through LangGraph's configurable dict.
+        run_config = {"configurable": {"gemini_model": gemini_model}}
+
         logger.info(f"[Job {job_id}] Running LangGraph RAG for: {question!r}")
-        result = await asyncio.to_thread(langgraph_app.invoke, initial_state)
+        result = await asyncio.to_thread(langgraph_app.invoke, initial_state, run_config)
 
         final_message = result["messages"][-1].content
         if isinstance(final_message, list):
@@ -135,6 +153,7 @@ ACCEPTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
 class QueryRequest(BaseModel):
     question: str
+    model: str = DEFAULT_ASTRO_MODEL  # Astro model id: 'nova' | 'pulsar' | 'quasar'
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -175,8 +194,8 @@ async def query_pdf(req: QueryRequest, background_tasks: BackgroundTasks):
     """Submit a question. Returns a job_id to poll for the answer."""
     job_id = str(uuid.uuid4())
     _save_job(job_id, {"status": "running", "output": None, "error": None})
-    background_tasks.add_task(_query_rag, job_id, req.question)
-    return {"event_id": job_id, "message": "Query started."}
+    background_tasks.add_task(_query_rag, job_id, req.question, req.model)
+    return {"event_id": job_id, "message": "Query started.", "astro_model": req.model}
 
 
 @app.get("/api/status/{job_id}")
