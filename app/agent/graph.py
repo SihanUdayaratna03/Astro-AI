@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Literal, TypedDict, List
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph import StateGraph, MessagesState
@@ -47,8 +48,8 @@ tool_node = ToolNode(tools)
 if "GEMINI_API_KEY" in os.environ and "GOOGLE_API_KEY" not in os.environ:
     os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
-# Initialize models with fallback chain
-MODELS = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.5-flash"]
+# Prioritise newer, faster models first; older ones as safe fallback
+MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
 
 def _create_model(model_name: str):
     return ChatGoogleGenerativeAI(
@@ -64,7 +65,7 @@ model_with_tools = model.bind_tools(tools)
 def call_model(state: AgentState):
     messages = state["messages"]
     last_error = None
-    for model_name in MODELS:
+    for idx, model_name in enumerate(MODELS):
         try:
             m = _create_model(model_name).bind_tools(tools)
             response = m.invoke(messages)
@@ -72,15 +73,26 @@ def call_model(state: AgentState):
         except Exception as e:
             last_error = e
             err_str = str(e).lower()
-            if "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str:
-                print(f"Model {model_name} quota exhausted, trying next...")
+            is_quota   = "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str
+            is_unavail = "503" in err_str or "unavailable" in err_str or "overloaded" in err_str or "high demand" in err_str
+            is_missing = "404" in err_str or "not found" in err_str or "not_found" in err_str
+            is_denied  = "403" in err_str or "permission" in err_str
+
+            if is_quota:
+                print(f"[Agent] Model {model_name} quota exhausted, trying next...")
                 last_error = Exception(f"Google API Quota Exhausted (Rate Limit). Please wait a minute or check your billing plan. Details: {e}")
+                time.sleep(2 ** idx)  # exponential backoff
                 continue
-            elif "404" in err_str or "not found" in err_str or "not_found" in err_str:
-                print(f"Model {model_name} not found/supported, trying next...")
+            elif is_unavail:
+                print(f"[Agent] Model {model_name} unavailable (503), trying next in {2**idx}s...")
+                last_error = Exception(f"Model temporarily unavailable (503). Retried all fallbacks. Details: {e}")
+                time.sleep(2 ** idx)
                 continue
-            elif "403" in err_str or "permission" in err_str:
-                print(f"Model {model_name} permission denied, trying next...")
+            elif is_missing:
+                print(f"[Agent] Model {model_name} not found/supported, trying next...")
+                continue
+            elif is_denied:
+                print(f"[Agent] Model {model_name} permission denied, trying next...")
                 continue
             else:
                 raise

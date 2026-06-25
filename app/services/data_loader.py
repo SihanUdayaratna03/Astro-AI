@@ -1,4 +1,5 @@
 import os
+import time
 import pathlib
 from google import genai
 from google.genai import types
@@ -83,7 +84,7 @@ def load_and_chunk_image(path: str) -> list[str]:
     last_error = None
     response = None
 
-    for model_name in MODELS:
+    for idx, model_name in enumerate(MODELS):
         try:
             response = client.models.generate_content(
                 model=model_name,
@@ -96,15 +97,26 @@ def load_and_chunk_image(path: str) -> list[str]:
         except Exception as e:
             last_error = e
             err_str = str(e).lower()
-            if "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str:
-                print(f"Model {model_name} quota exhausted or rate limited, trying next...")
-                last_error = Exception(f"Google API Quota Exhausted (Rate Limit). Please wait a minute or check your billing plan. Details: {e}")
+            is_quota   = "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str
+            is_unavail = "503" in err_str or "unavailable" in err_str or "overloaded" in err_str or "high demand" in err_str
+            is_missing = "404" in err_str or "not found" in err_str or "not_found" in err_str
+            is_denied  = "403" in err_str or "permission" in err_str
+
+            if is_quota:
+                print(f"[OCR] Model {model_name} quota exhausted, trying next...")
+                last_error = Exception(f"Google API Quota Exhausted. Please wait or check your billing plan. Details: {e}")
+                time.sleep(2 ** idx)  # exponential backoff: 1s, 2s, 4s, 8s
                 continue
-            elif "404" in err_str or "not found" in err_str or "not_found" in err_str:
-                print(f"Model {model_name} not found, trying next...")
+            elif is_unavail:
+                print(f"[OCR] Model {model_name} unavailable (503), retrying next model in {2**idx}s...")
+                last_error = Exception(f"Model temporarily unavailable (503). Retried all fallbacks. Details: {e}")
+                time.sleep(2 ** idx)
                 continue
-            elif "403" in err_str or "permission" in err_str:
-                print(f"Model {model_name} permission denied, trying next...")
+            elif is_missing:
+                print(f"[OCR] Model {model_name} not found, trying next...")
+                continue
+            elif is_denied:
+                print(f"[OCR] Model {model_name} permission denied, trying next...")
                 continue
             else:
                 raise
