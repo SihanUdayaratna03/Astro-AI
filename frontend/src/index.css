@@ -1927,4 +1927,246 @@ body,
   background: rgba(255, 255, 255, 0.05);
 }
 
-
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STUDY MODE
+═══════════════════════════════════════════════════════════════════════════════ */
+.study-mode-container {
+  height: 100%;
+  overflow-y: auto;
+  padding: 2rem;
+  background: var(--bg);
+  animation: fade-in 0.3s ease;
+}
+
+.study-header {
+  margin-bottom: 2rem;
+}
+
+.study-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.study-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.study-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  align-items: center;
+}
+
+.study-select {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.study-select:focus {
+  border-color: var(--accent);
+}
+
+.study-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.study-btn:hover:not(:disabled) {
+  background: #3a78f2;
+}
+
+.study-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.study-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.study-section h3 {
+  font-size: 1.2rem;
+  margin: 0 0 1rem 0;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.study-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.study-q {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.study-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.study-opt {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.study-opt.correct {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.opt-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.study-opt.correct .opt-letter {
+  background: #10b981;
+  color: #fff;
+}
+
+.study-tf-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.study-tf-badge.true {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.study-tf-badge.false {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.study-explanation {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  background: rgba(255,255,255,0.02);
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+/* Flashcards Grid */
+.flashcards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.flashcard {
+  height: 200px;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.flashcard-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.flashcard:hover .flashcard-inner {
+  transform: rotateY(180deg);
+}
+
+.flashcard-front, .flashcard-back {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  text-align: center;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.flashcard-front {
+  background: linear-gradient(145deg, var(--card-bg), var(--bg));
+  color: var(--text-primary);
+}
+
+.flashcard-back {
+  background: linear-gradient(145deg, var(--accent), #3a78f2);
+  color: #fff;
+  transform: rotateY(180deg);
+  border: none;
+}
+
+.fc-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+  margin-bottom: 0.75rem;
+}

@@ -167,6 +167,32 @@ async def _query_rag(job_id: str, question: str, astro_model: str = DEFAULT_ASTR
         _save_job(job_id, {"status": "failed", "output": None, "error": str(e)})
 
 
+async def _generate_quiz_task(job_id: str, filename: str, quiz_type: str, astro_model: str):
+    _save_job(job_id, {"status": "running", "output": None, "error": None})
+    try:
+        from app.services.vector_db import get_storage
+        from app.services.quiz_generator import generate_quiz_from_chunks
+        
+        logger.info(f"[Job {job_id}] Fetching chunks for document '{filename}' from Qdrant...")
+        chunks = await asyncio.to_thread(get_storage().get_document_chunks, filename, 100)
+        
+        if not chunks:
+            raise ValueError(f"No indexed content found for '{filename}'. Make sure the document is ingested.")
+
+        logger.info(f"[Job {job_id}] Generating {quiz_type} quiz using {astro_model}...")
+        quiz_data = await asyncio.to_thread(generate_quiz_from_chunks, chunks, quiz_type, astro_model)
+        
+        logger.info(f"[Job {job_id}] Quiz generated successfully.")
+        _save_job(job_id, {
+            "status": "completed",
+            "output": quiz_data,
+            "error": None,
+        })
+    except Exception as e:
+        logger.error(f"[Job {job_id}] Quiz generation failed: {e}", exc_info=True)
+        _save_job(job_id, {"status": "failed", "output": None, "error": str(e)})
+
+
 # ── Accepted file extensions ────────────────────────────────────────────────
 ACCEPTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 
@@ -175,8 +201,23 @@ class QueryRequest(BaseModel):
     question: str
     model: str = DEFAULT_ASTRO_MODEL  # Astro model id: 'nova' | 'pulsar' | 'quasar'
 
+class QuizRequest(BaseModel):
+    filename: str
+    quiz_type: str = "mcq"  # 'mcq', 'flashcards', 'true_false', or 'all'
+    model: str = DEFAULT_ASTRO_MODEL
+
 
 # ── Routes ───────────────────────────────────────────────────────────────────
+
+@app.post("/api/generate-quiz")
+async def generate_quiz(req: QuizRequest, background_tasks: BackgroundTasks):
+    """Generate a quiz from an already indexed document. Returns a job_id."""
+    job_id = str(uuid.uuid4())
+    _save_job(job_id, {"status": "running", "output": None, "error": None})
+    background_tasks.add_task(_generate_quiz_task, job_id, req.filename, req.quiz_type, req.model)
+    return {"event_id": job_id, "message": "Quiz generation started.", "astro_model": req.model}
+
+
 
 @app.post("/api/upload")
 async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):

@@ -37,6 +37,29 @@ class QdrantStorage:
 
         return {"contexts": contexts, "sources": list(sources)}
 
+    def get_document_chunks(self, source_filename: str, limit: int = 50) -> list[str]:
+        from qdrant_client.http import models
+        response, _ = self.client.scroll(
+            collection_name=self.collection,
+            scroll_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="source",
+                        match=models.MatchValue(value=source_filename)
+                    )
+                ]
+            ),
+            limit=limit,
+            with_payload=True,
+        )
+        chunks = []
+        for r in response:
+            payload = getattr(r, "payload", None) or {}
+            text = payload.get("text", "")
+            if text:
+                chunks.append(text)
+        return chunks
+
 
 # ── Module-level singleton ──────────────────────────────────────────────────
 # Avoids creating a new TCP connection + collection_exists check per request.

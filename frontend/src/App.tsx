@@ -246,9 +246,11 @@ interface TopbarProps {
   historyOpen: boolean;
   selectedModel: AstroModel;
   onModelChange: (m: AstroModel) => void;
+  onToggleStudyMode: () => void;
+  isStudyMode: boolean;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, selectedModel, onModelChange }) => (
+const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, selectedModel, onModelChange, onToggleStudyMode, isStudyMode }) => (
   <header className="topbar">
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <button
@@ -272,6 +274,15 @@ const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHis
         <div className="status-badge"><Database size={11} /> Qdrant <div className="status-dot" /></div>
         <div className="status-badge"><Cpu size={11} /> Gemini <div className="status-dot" /></div>
       </div>
+      {/* Study Mode toggle */}
+      <button
+        className={`topbar-action-btn ${isStudyMode ? 'active' : ''}`}
+        onClick={onToggleStudyMode}
+        title="Study Mode (Quizzes & Flashcards)"
+      >
+        <BookOpen size={15} />
+        <span>Study Mode</span>
+      </button>
       {/* New Chat button */}
       <button
         className="topbar-action-btn"
@@ -753,6 +764,105 @@ const MsgBubble: React.FC<{ msg: Message }> = ({ msg }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// STUDY MODE VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+const StudyModeView: React.FC<{
+  quizType: string;
+  setQuizType: (t: string) => void;
+  onGenerate: () => void;
+  isLoading: boolean;
+  error: string;
+  data: any;
+  hasDocument: boolean;
+}> = ({ quizType, setQuizType, onGenerate, isLoading, error, data, hasDocument }) => {
+  return (
+    <div className="study-mode-container">
+      <div className="study-header">
+        <h2><BookOpen size={20} /> Study Mode</h2>
+        <p>Generate interactive quizzes and flashcards from your indexed document.</p>
+      </div>
+
+      <div className="study-controls">
+        <select value={quizType} onChange={(e) => setQuizType(e.target.value)} className="study-select">
+          <option value="mcq">Multiple Choice Questions (MCQ)</option>
+          <option value="flashcards">Flashcards</option>
+          <option value="true_false">True / False</option>
+        </select>
+        <button className="study-btn" onClick={onGenerate} disabled={isLoading || !hasDocument}>
+          {isLoading ? <Loader2 size={16} className="spin" /> : <Cpu size={16} />}
+          {isLoading ? 'Generating...' : 'Generate Quiz'}
+        </button>
+      </div>
+
+      {!hasDocument && !isLoading && (
+        <div className="alert warning">Please upload and index a document first.</div>
+      )}
+
+      {error && <div className="alert error">{error}</div>}
+
+      <div className="study-results">
+        {data?.mcqs?.length > 0 && (
+          <div className="study-section">
+            <h3>Multiple Choice Questions</h3>
+            {data.mcqs.map((mcq: any, i: number) => (
+              <div key={i} className="study-card">
+                <div className="study-q"><strong>{i + 1}.</strong> {mcq.question}</div>
+                <div className="study-options">
+                  {mcq.options.map((opt: any, j: number) => (
+                    <div key={j} className={`study-opt ${opt.is_correct ? 'correct' : ''}`}>
+                      <span className="opt-letter">{['A','B','C','D'][j] || '-'}</span> {opt.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {data?.flashcards?.length > 0 && (
+          <div className="study-section">
+            <h3>Flashcards</h3>
+            <div className="flashcards-grid">
+              {data.flashcards.map((fc: any, i: number) => (
+                <div key={i} className="flashcard">
+                  <div className="flashcard-inner">
+                    <div className="flashcard-front">
+                      <div className="fc-label">Q</div>
+                      {fc.front}
+                    </div>
+                    <div className="flashcard-back">
+                      <div className="fc-label">A</div>
+                      {fc.back}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {data?.true_false?.length > 0 && (
+          <div className="study-section">
+            <h3>True / False Questions</h3>
+            {data.true_false.map((tf: any, i: number) => (
+              <div key={i} className="study-card">
+                <div className="study-q"><strong>{i + 1}.</strong> {tf.statement}</div>
+                <div className={`study-tf-badge ${tf.is_true ? 'true' : 'false'}`}>
+                  {tf.is_true ? 'True' : 'False'}
+                </div>
+                <div className="study-explanation">
+                  <strong>Explanation:</strong> {tf.explanation}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
@@ -824,6 +934,13 @@ export default function App() {
 
   // ── History panel state ───────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // ── Study Mode state ──────────────────────────────────────────────────────────
+  const [isStudyMode, setIsStudyMode] = useState(false);
+  const [quizType, setQuizType] = useState('mcq');
+  const [quizData, setQuizData] = useState<any>(null);
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState('');
 
   // ── Input / querying state ────────────────────────────────────────────────────
   const [inputValue, setInputValue] = useState('');
@@ -1076,6 +1193,38 @@ export default function App() {
     if (ocrEventId) handleOcrIngest(ocrEventId);
   };
 
+  // ── Study Mode handlers ──────────────────────────────────────────────────────
+  const handleGenerateQuiz = async () => {
+    const filename = activeTab === 'pdf' ? pdfFile?.name : scanFile?.file.name;
+    if (!filename) {
+      setQuizError("Please upload and ingest a document first.");
+      return;
+    }
+
+    setIsQuizLoading(true);
+    setQuizError('');
+    setQuizData(null);
+
+    try {
+      const res = await fetch(`${API}/generate-quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, quiz_type: quizType, model: selectedModel.id })
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail || 'Quiz generation failed');
+      }
+      const data = await res.json();
+      const out = await pollStatus(data.event_id);
+      setQuizData(out);
+    } catch (err: any) {
+      setQuizError(err.message || 'Failed to generate quiz. Please try again.');
+    } finally {
+      setIsQuizLoading(false);
+    }
+  };
+
   const pdfDragOver = (e: React.DragEvent) => { e.preventDefault(); setPdfDrag(true); };
   const pdfDragLeave = () => setPdfDrag(false);
   const pdfDrop = (e: React.DragEvent) => { e.preventDefault(); setPdfDrag(false); if (e.dataTransfer.files?.[0]) handlePdfSelect(e.dataTransfer.files[0]); };
@@ -1179,6 +1328,8 @@ export default function App() {
           historyOpen={historyOpen}
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
+          isStudyMode={isStudyMode}
+          onToggleStudyMode={() => setIsStudyMode(v => !v)}
         />
       )}
 
@@ -1242,7 +1393,19 @@ export default function App() {
 
           {!isZenMode && showScanningAnim && <ScanningView preview={scanFile.preview} />}
 
-          {chatViewMode === 'graph' && hasMessages ? (
+          {isStudyMode ? (
+            <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+              <StudyModeView
+                quizType={quizType}
+                setQuizType={setQuizType}
+                onGenerate={handleGenerateQuiz}
+                isLoading={isQuizLoading}
+                error={quizError}
+                data={quizData}
+                hasDocument={!!(pdfFile || scanFile)}
+              />
+            </div>
+          ) : chatViewMode === 'graph' && hasMessages ? (
             <div style={{ flex: 1, overflow: 'hidden', position: 'relative', margin: '1rem', borderRadius: 8, border: '1px solid var(--border)' }}>
               <MindMapView messages={messages} />
             </div>
@@ -1286,7 +1449,7 @@ export default function App() {
           )}
 
           {/* Input bar */}
-          {!showScanningAnim && (
+          {!showScanningAnim && !isStudyMode && (
             <div className="input-bar-container">
               <div className="input-bar">
                 <div style={{ display: 'flex', marginBottom: '8px', paddingLeft: '8px' }}>
