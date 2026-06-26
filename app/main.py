@@ -58,7 +58,7 @@ async def _ingest_document(job_id: str, file_path: str, source_id: str):
     _save_job(job_id, {"status": "running", "output": None, "error": None})
     try:
         from app.services.data_loader import load_and_chunk_pdf, load_and_chunk_image, get_file_type, embed_texts
-        from app.services.vector_db import QdrantStorage
+        from app.services.vector_db import get_storage
 
         file_type = get_file_type(file_path)
         logger.info(f"[Job {job_id}] Loading file type={file_type} path={file_path}")
@@ -77,7 +77,7 @@ async def _ingest_document(job_id: str, file_path: str, source_id: str):
         payloads = [{"source": source_id, "text": chunks[i]} for i in range(len(chunks))]
 
         logger.info(f"[Job {job_id}] Upserting {len(chunks)} vectors to Qdrant...")
-        await asyncio.to_thread(lambda: QdrantStorage().upsert(ids, vecs, payloads))
+        await asyncio.to_thread(lambda: get_storage().upsert(ids, vecs, payloads))
 
         logger.info(f"[Job {job_id}] Done! Ingested {len(chunks)} chunks.")
         _save_job(job_id, {
@@ -90,12 +90,32 @@ async def _ingest_document(job_id: str, file_path: str, source_id: str):
         _save_job(job_id, {"status": "failed", "output": None, "error": str(e)})
 
 
+async def _ingest_prechunked(job_id: str, chunks: list[str], source_id: str):
+    """Background task: embed and upsert pre-extracted chunks (no re-OCR)."""
+    _save_job(job_id, {"status": "running", "output": None, "error": None})
+    try:
+        from app.services.data_loader import ingest_prechunked_chunks
+
+        logger.info(f"[Job {job_id}] Ingesting {len(chunks)} pre-extracted chunks for '{source_id}'...")
+        count = await asyncio.to_thread(ingest_prechunked_chunks, chunks, source_id)
+
+        logger.info(f"[Job {job_id}] Done! Ingested {count} chunks.")
+        _save_job(job_id, {
+            "status": "completed",
+            "output": {"ingested": count},
+            "error": None,
+        })
+    except Exception as e:
+        logger.error(f"[Job {job_id}] Pre-chunked ingest failed: {e}", exc_info=True)
+        _save_job(job_id, {"status": "failed", "output": None, "error": str(e)})
+
+
 # ── Astro AI model → Gemini model mapping ──────────────────────────────────
 # Adding a new Astro AI model in the future only requires adding an entry here.
 ASTRO_MODEL_MAP: dict[str, str] = {
-    "nova":   "gemini-1.5-flash",    # Astro AI Nova   — fast, lightweight
-    "pulsar": "gemini-2.0-flash",    # Astro AI Pulsar — balanced (default)
-    "quasar": "gemini-1.5-pro",      # Astro AI Quasar — powerful, deep reasoning
+    "nova":   "gemini-2.0-flash",    # Astro AI Nova   — fast, lightweight
+    "pulsar": "gemini-2.5-flash",    # Astro AI Pulsar — balanced (default)
+    "quasar": "gemini-2.5-pro",      # Astro AI Quasar — powerful, deep reasoning
 }
 DEFAULT_ASTRO_MODEL = "nova"
 
@@ -246,9 +266,11 @@ async def ocr_scan_image(background_tasks: BackgroundTasks, file: UploadFile = F
 
     extracted_text = "\n\n".join(chunks)
 
+    # Use _ingest_prechunked instead of _ingest_document to avoid re-running OCR.
+    # The chunks are already extracted above — just embed + upsert them.
     job_id = str(uuid.uuid4())
     _save_job(job_id, {"status": "running", "output": None, "error": None})
-    background_tasks.add_task(_ingest_document, job_id, str(file_path.resolve()), file.filename)
+    background_tasks.add_task(_ingest_prechunked, job_id, chunks, file.filename)
 
     return {
         "extracted_text": extracted_text,

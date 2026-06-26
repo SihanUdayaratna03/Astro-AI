@@ -1,3 +1,4 @@
+import threading
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct
 
@@ -35,3 +36,19 @@ class QdrantStorage:
                 sources.add(source)
 
         return {"contexts": contexts, "sources": list(sources)}
+
+
+# ── Module-level singleton ──────────────────────────────────────────────────
+# Avoids creating a new TCP connection + collection_exists check per request.
+_storage_instance = None
+_storage_lock = threading.Lock()
+
+
+def get_storage() -> QdrantStorage:
+    """Return a cached QdrantStorage singleton (thread-safe)."""
+    global _storage_instance
+    if _storage_instance is None:
+        with _storage_lock:
+            if _storage_instance is None:
+                _storage_instance = QdrantStorage()
+    return _storage_instance

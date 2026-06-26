@@ -125,7 +125,7 @@ function loadConversations(): Conversation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { }
   return [];
 }
 
@@ -138,11 +138,19 @@ async function pollStatus(eventId: string): Promise<any> {
     const iv = setInterval(async () => {
       try {
         const r = await fetch(`${API}/status/${eventId}`);
+        if (!r.ok) {
+           clearInterval(iv);
+           reject(new Error(`Server error: ${r.status}`));
+           return;
+        }
         const d = await r.json();
         if (d.status === 'completed') { clearInterval(iv); resolve(d.output); }
         else if (['failed', 'error'].includes(d.status)) { clearInterval(iv); reject(new Error(d.error || 'Processing failed')); }
       } catch (e) { clearInterval(iv); reject(e); }
-    }, 1500);
+    }, 500); // Poll every 500ms (was 1500ms) — picks up answers 3x faster
+
+    // Safety timeout: if nothing resolves in 300s, fail gracefully instead of hanging forever
+    setTimeout(() => { clearInterval(iv); reject(new Error('Request timed out after 300 seconds.')); }, 300_000);
   });
 }
 
@@ -176,7 +184,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selected, onChange }) => 
       >
         <span className="model-trigger-name">{selected.fullName}</span>
         {selected.badge && <span className="model-badge">{selected.badge}</span>}
-        <svg className={`model-chevron ${open ? 'flipped' : ''}`} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        <svg className={`model-chevron ${open ? 'flipped' : ''}`} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>
 
       {open && (
@@ -191,9 +199,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selected, onChange }) => 
             >
               <div className="model-option-left">
                 <div className="model-option-icon">
-                  {m.id === 'nova'   && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>}
-                  {m.id === 'pulsar' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h3M19 12h3M12 2v3M12 19v3"/></svg>}
-                  {m.id === 'quasar' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="m9 12 2 2 4-4"/><circle cx="19" cy="5" r="3"/></svg>}
+                  {m.id === 'nova' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>}
+                  {m.id === 'pulsar' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h3M19 12h3M12 2v3M12 19v3" /></svg>}
+                  {m.id === 'quasar' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 10 10" /><path d="m9 12 2 2 4-4" /><circle cx="19" cy="5" r="3" /></svg>}
                 </div>
                 <div>
                   <div className="model-option-name">{m.fullName}</div>
@@ -203,7 +211,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ selected, onChange }) => 
               <div className="model-option-right">
                 {m.badge && <span className={`model-badge ${m.isDisabled ? 'disabled' : ''}`}>{m.badge}</span>}
                 {m.id === selected.id && !m.isDisabled && (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 )}
               </div>
             </button>
@@ -250,7 +258,7 @@ const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHis
         onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
         title="Back to Landing Page"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         Landing
       </button>
       <div className="topbar-logo">
@@ -521,11 +529,10 @@ const ScanSection: React.FC<ScanSectionProps> = ({
       )}
 
       {scanStatus !== 'idle' && (
-        <div className={`alert ${
-          scanStatus === 'ready' ? 'success' :
-          scanStatus === 'error' ? 'error' :
-          scanStatus === 'scanned' ? 'ocr' : 'processing'
-        }`}>
+        <div className={`alert ${scanStatus === 'ready' ? 'success' :
+            scanStatus === 'error' ? 'error' :
+              scanStatus === 'scanned' ? 'ocr' : 'processing'
+          }`}>
           {scanStatus === 'ready' && <CheckCircle2 size={13} style={{ flexShrink: 0 }} />}
           {scanStatus === 'error' && <AlertCircle size={13} style={{ flexShrink: 0 }} />}
           {scanStatus === 'scanned' && <ScanText size={13} style={{ flexShrink: 0 }} />}
@@ -711,7 +718,7 @@ const MsgBubble: React.FC<{ msg: Message }> = ({ msg }) => {
         <div className="markdown-body">
           <ReactMarkdown
             components={{
-              code({node, inline, className, children, ...props}: any) {
+              code({ node, inline, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '')
                 return !inline && match ? (
                   <SyntaxHighlighter
@@ -1176,7 +1183,7 @@ export default function App() {
       )}
 
       {isZenMode && (
-        <button onClick={() => setIsZenMode(false)} style={{position: 'fixed', top: 20, right: 20, zIndex: 1000, background: 'var(--card-bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: 6, color: 'var(--text-secondary)'}}>
+        <button onClick={() => setIsZenMode(false)} style={{ position: 'fixed', top: 20, right: 20, zIndex: 1000, background: 'var(--card-bg)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: 6, color: 'var(--text-secondary)' }}>
           Exit Zen Mode
         </button>
       )}
@@ -1215,14 +1222,14 @@ export default function App() {
         {/* ── SPLIT VIEWER ── */}
         {isSplitView && (pdfFile || scanFile) && !isZenMode && (
           <div className="viewer-pane" style={{ borderRight: '1px solid var(--border)', width: '35%', background: '#fff' }}>
-             {activeTab === 'pdf' && pdfFile && (
-               <iframe src={URL.createObjectURL(pdfFile)} title="PDF Viewer" width="100%" height="100%" style={{border: 'none'}} />
-             )}
-             {activeTab === 'scan' && scanFile && (
-               <div style={{width:'100%', height:'100%', overflow:'auto', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                 <img src={scanFile.preview} style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain'}} />
-               </div>
-             )}
+            {activeTab === 'pdf' && pdfFile && (
+              <iframe src={URL.createObjectURL(pdfFile)} title="PDF Viewer" width="100%" height="100%" style={{ border: 'none' }} />
+            )}
+            {activeTab === 'scan' && scanFile && (
+              <div style={{ width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={scanFile.preview} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              </div>
+            )}
           </div>
         )}
 
@@ -1236,31 +1243,31 @@ export default function App() {
           {!isZenMode && showScanningAnim && <ScanningView preview={scanFile.preview} />}
 
           {chatViewMode === 'graph' && hasMessages ? (
-             <div style={{flex: 1, overflow: 'hidden', position: 'relative', margin: '1rem', borderRadius: 8, border: '1px solid var(--border)'}}>
-               <MindMapView messages={messages} />
-             </div>
+            <div style={{ flex: 1, overflow: 'hidden', position: 'relative', margin: '1rem', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <MindMapView messages={messages} />
+            </div>
           ) : (
-             <>
-                {!showScanningAnim && !showScanResult && (
-                  hasMessages ? (
-                    <div className="messages-wrap" ref={messagesWrapRef} onScroll={handleScroll}>
-                      {messages.map(m => <MsgBubble key={m.id} msg={m} />)}
-                      {isQuerying && <TypingIndicator />}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  ) : (
-                    activeTab === 'pdf' ? <HeroDocuments onChip={handleChipClick} /> : <HeroScan onChip={handleChipClick} />
-                  )
-                )}
-
-                {showScanResult && hasMessages && (
-                  <div className="messages-wrap" ref={messagesWrapRef} style={{ flex: 1 }} onScroll={handleScroll}>
+            <>
+              {!showScanningAnim && !showScanResult && (
+                hasMessages ? (
+                  <div className="messages-wrap" ref={messagesWrapRef} onScroll={handleScroll}>
                     {messages.map(m => <MsgBubble key={m.id} msg={m} />)}
                     {isQuerying && <TypingIndicator />}
                     <div ref={messagesEndRef} />
                   </div>
-                )}
-             </>
+                ) : (
+                  activeTab === 'pdf' ? <HeroDocuments onChip={handleChipClick} /> : <HeroScan onChip={handleChipClick} />
+                )
+              )}
+
+              {showScanResult && hasMessages && (
+                <div className="messages-wrap" ref={messagesWrapRef} style={{ flex: 1 }} onScroll={handleScroll}>
+                  {messages.map(m => <MsgBubble key={m.id} msg={m} />)}
+                  {isQuerying && <TypingIndicator />}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </>
           )}
 
           {showScrollBottom && hasMessages && (
@@ -1309,9 +1316,9 @@ export default function App() {
                     {isQuerying ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
                   </button>
                 </div>
-                <div className="input-hint" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <div className="input-hint" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Enter to send · Shift+Enter for new line</span>
-                  <span style={{opacity: 0.5}}>Try /zen, /split, /map, /export</span>
+                  <span style={{ opacity: 0.5 }}>Try /zen, /split, /map, /export</span>
                 </div>
               </div>
             </div>
