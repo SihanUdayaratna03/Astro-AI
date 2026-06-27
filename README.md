@@ -1,14 +1,16 @@
-﻿# Astro AI
+# Astro AI
 
 ![Welcome to Astro AI](screenshot.png)
 
-**Astro AI** is an intelligent document assistant built with **React**, **FastAPI**, **LangGraph**, **sentence-transformers**, **Qdrant**, and the **Google Gemini API**. Upload a PDF or image, and instantly ask questions about it using natural language. Astro AI retrieves the most relevant context from your documents and generates precise, source-grounded answers — all without sending your raw documents to an external server.
+**Astro AI** is an intelligent document assistant built with **React**, **FastAPI**, **LangGraph**, **sentence-transformers**, **Qdrant**, **MySQL**, and the **Google Gemini API**. Upload a PDF or image, and instantly ask questions about it using natural language. Astro AI retrieves the most relevant context from your documents and generates precise, source-grounded answers. 
+
+Beyond standard RAG, Astro AI automatically extracts a **Multi-Hop Knowledge Graph** from your documents, computes PageRank centrality, and empowers the AI to deductively trace hidden connections between concepts using advanced Recursive SQL queries.
 
 ---
 
 ## Architecture
 
-The system uses Python's asynchronous background tasks for reliable processing, keeping embeddings fully local to avoid API quota costs.
+The system uses Python's asynchronous background tasks for reliable processing. Embeddings are kept fully local to avoid API quota costs, while complex entity extraction relies on Gemini.
 
 ```mermaid
 graph TD
@@ -22,15 +24,23 @@ graph TD
     API[FastAPI Backend]:::backend
     SentenceTransformer[Local Embeddings sentence-transformers]:::localAI
     Qdrant[(Qdrant Vector DB)]:::database
-    Gemini[Google Gemini API Astro AI Nova / Pulsar / Quasar]:::extAPI
+    MySQL[(MySQL Graph DB)]:::database
+    Gemini[Google Gemini API]:::extAPI
 
     UI -- "1. Upload PDF/Image" --> API
     UI -- "1b. Poll Status" --> API
 
     subgraph FastAPI Background Tasks
-        API -- "Extract Text and Chunk" --> Chunking[Sentence Splitter]
-        Chunking -- "Generate Vectors local" --> SentenceTransformer
+        API -- "Extract Text & Chunk" --> Chunking[Sentence Splitter]
+        Chunking -- "Generate Vectors" --> SentenceTransformer
         SentenceTransformer -- "Save Vectors" --> Qdrant
+        
+        API -- "Extract Entities & Relationships" --> Gemini
+        Gemini -- "Graph JSON" --> NetworkX[NetworkX Centrality Analytics]
+        NetworkX -- "Save Nodes, Edges, Scores" --> MySQL
+    end
+
+    subgraph Search Phase
         API -- "Search Query" --> SentenceTransformer
         SentenceTransformer -- "Find Nearest Chunks" --> Qdrant
         Qdrant -- "Return Context" --> API
@@ -45,7 +55,7 @@ graph TD
 
 ## Agentic RAG Workflow (LangGraph)
 
-When a user asks a question, Astro AI delegates to a **LangGraph Agent** — a cyclic reasoning loop that decides whether to search the database, calculate, or synthesize a final answer. The model used for each request is dynamically injected via **LangGraph RunnableConfig**, making the full model tier system completely stateless and scalable.
+When a user asks a question, Astro AI delegates to a **LangGraph Agent** — a cyclic reasoning loop that decides whether to search the vector database, query the relational knowledge graph, calculate math, or synthesize a final answer. 
 
 ```mermaid
 graph TD
@@ -54,22 +64,25 @@ graph TD
     classDef tools fill:#e67e22,stroke:#fff,stroke-width:2px,color:#fff
     classDef fallback fill:#c0392b,stroke:#fff,stroke-width:2px,color:#fff
 
-    Start((User Query and Selected Model))
+    Start((User Query))
     State[AgentState Messages, Sources, Contexts]:::state
-    Config[RunnableConfig gemini_model injected]:::state
+    Config[RunnableConfig gemini_model]:::state
     LLM[Gemini LLM Reasoning Engine]:::model
-    Fallback[Model Fallback Chain 503 / 429 Retry and Backoff]:::fallback
+    Fallback[Model Fallback Chain 503/429]:::fallback
     ShouldContinue{Tool Call Required?}
 
     subgraph Tools Node
         ToolNode[Execute Tools]:::tools
-        Search[search_document Queries Qdrant DB]:::tools
-        Calc[calculate_expression Safe Math Evaluation]:::tools
+        Search[search_document Qdrant]:::tools
+        MultiHop[find_connection_path MySQL CTE]:::tools
+        Calc[calculate_expression Safe Math]:::tools
+        
         ToolNode --> Search
+        ToolNode --> MultiHop
         ToolNode --> Calc
     end
 
-    End((Final Answer and Sources))
+    End((Final Answer))
 
     Start --> Config
     Config --> State
@@ -83,13 +96,13 @@ graph TD
 ```
 
 **How the Agent Works:**
-
-1. **Model Selection** — The user picks an Astro AI model tier in the UI. The frontend sends the model ID (`nova`, `pulsar`, `quasar`) with every query.
-2. **Model Routing** — `main.py` resolves the Astro model ID to the underlying Gemini model name and injects it into LangGraph via `RunnableConfig`.
-3. **Initialize State** — The agent initializes a state object tracking all messages, sources, and context counts.
-4. **Reasoning Loop** — The selected Gemini LLM decides whether to call a tool. If it calls `search_document`, the tool embeds the query locally, searches Qdrant, and returns relevant paragraphs and source filenames.
-5. **Self-Healing Fallback** — If the primary model returns a `503 Unavailable` or `429 Rate Limit` error, the system automatically retries with the next model using exponential backoff — invisibly to the user.
-6. **Synthesis** — The LLM synthesizes the final grounded answer and returns it with cited sources.
+1. **Model Selection** — The user picks an Astro AI model tier in the UI.
+2. **Initialize State** — The agent tracks messages, sources, and context counts.
+3. **Reasoning Loop** — The Gemini LLM decides which tool to call:
+   - `search_document`: Embeds the query locally and searches Qdrant for textual context.
+   - `find_connection_path`: Executes a `WITH RECURSIVE` SQL CTE query in MySQL to trace connections between two concepts up to 4 hops deep.
+4. **Self-Healing Fallback** — The system automatically retries with the next model on `503` and `429` errors.
+5. **Synthesis** — The LLM synthesizes the final grounded answer and returns it with cited sources.
 
 ---
 
@@ -100,60 +113,39 @@ Astro AI uses a named model tier system. Each tier maps to an underlying Gemini 
 | Astro AI Model      | Underlying Model   | Status        | Description                                  |
 |---------------------|--------------------|---------------|----------------------------------------------|
 | **Astro AI Nova**   | `gemini-1.5-flash` | Available     | Fast and lightweight. Ideal for quick lookups. |
-| **Astro AI Pulsar** | `gemini-2.0-flash` | Coming Soon   | Balanced. Recommended for most tasks.        |
-| **Astro AI Quasar** | `gemini-1.5-pro`   | Coming Soon   | Most powerful. Deep reasoning and analysis.  |
-
-> To add a new model tier, add one entry to `ASTRO_MODEL_MAP` in `app/main.py` and one entry to `ASTRO_MODELS` in `frontend/src/App.tsx`.
+| **Astro AI Pulsar** | `gemini-2.0-flash` | Available     | Balanced. Recommended for most tasks.        |
+| **Astro AI Quasar** | `gemini-1.5-pro`   | Available     | Most powerful. Deep reasoning and analysis.  |
 
 ---
 
-## OCR Workflow (Image Processing)
+## Advanced Features: Multi-Hop Knowledge Graph
 
-When a user uploads an image instead of a PDF, Astro AI uses Gemini Vision for OCR before passing extracted text into the standard embedding pipeline.
+Astro AI doesn't just read your text; it maps the relationships inside it.
 
-```mermaid
-graph TD
-    classDef frontend fill:#ff4b4b,stroke:#fff,stroke-width:2px,color:#fff
-    classDef backend fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
-    classDef extAPI fill:#4285f4,stroke:#fff,stroke-width:2px,color:#fff
-    classDef localAI fill:#f39c12,stroke:#fff,stroke-width:2px,color:#fff
-    classDef database fill:#673ab7,stroke:#fff,stroke-width:2px,color:#fff
-
-    Upload((Upload Image)):::frontend
-    FastAPI[FastAPI Backend]:::backend
-    GeminiVision[Gemini Vision API OCR]:::extAPI
-    Chunking[Sentence Splitter]:::backend
-    SentenceTransformer[Local Embeddings]:::localAI
-    Qdrant[(Qdrant Vector DB)]:::database
-
-    Upload --> FastAPI
-    FastAPI -- "Send Image Bytes" --> GeminiVision
-    GeminiVision -- "Return Raw Text" --> FastAPI
-    FastAPI --> Chunking
-    Chunking -- "Generate Vectors local" --> SentenceTransformer
-    SentenceTransformer -- "Save Vectors" --> Qdrant
-```
+1. **Entity Extraction**: During ingestion, Gemini extracts core entities (People, Organizations, Concepts) and their relationships.
+2. **PageRank Centrality Analytics**: Using `networkx`, the backend computes a PageRank centrality score for every node to determine its global importance within the document.
+3. **Visual Split-View**: The frontend renders this graph dynamically using `react-force-graph-2d`. Highly central nodes are physically larger, allowing you to instantly spot the most important concepts.
+4. **Ghost Drag UX**: You can drag nodes directly off the canvas and drop them into the persistent chat bar! Dropping two nodes automatically constructs a Multi-Hop query for the LangGraph agent.
 
 ---
 
 ## How to Run Locally
 
-Open **three separate terminals** to run all required services.
+Open **separate terminals** to run all required services.
 
-### 1. Start Qdrant (Vector Database)
-
+### 1. Start Databases
+Ensure you have MySQL running on `localhost:3306` with a database named `astro_ai` and root password `root`.
+Start Qdrant (Vector Database):
 ```bash
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
 ### 2. Start the FastAPI Backend
-
 ```bash
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ### 3. Start the React Frontend
-
 ```bash
 cd frontend
 npm run dev
@@ -163,26 +155,17 @@ Navigate to **http://localhost:5173** in your browser.
 
 ---
 
-## Usage
-
-1. Go to **http://localhost:5173** and click **Get Started**.
-2. In the sidebar, upload a **PDF or image**. Wait for the green success indicator.
-3. In the chat area, type any question about your document and press Send.
-4. Astro AI retrieves the most relevant chunks and generates a grounded answer with source citations.
-
----
-
-## Features
+## Features Matrix
 
 | Feature | Description |
 |---|---|
-| **Astro AI Model Tiers** | Named model variants (Nova, Pulsar, Quasar) mapping to specific Gemini models with an in-chat model selector. |
-| **Agentic RAG (LangGraph)** | A cyclic LangGraph agent that decides when to search, calculate, or answer — not a naive search-then-summarize pipeline. |
-| **Local Embeddings** | Uses `sentence-transformers` (`all-MiniLM-L6-v2`) locally — zero API calls for embedding, zero quota usage. |
-| **Local Vector DB** | Qdrant runs locally; document data stays on your machine until only the most relevant paragraphs are sent to the LLM. |
-| **Multi-Model Fallback** | Automatically retries across Gemini models with exponential backoff on 503 and 429 errors. |
-| **Multimodal OCR** | Supports PDFs and images (PNG, JPG, WEBP) via Gemini Vision OCR of text, tables, and charts. |
-| **Multi-Conversation History** | Full conversation management with independent chats, history panel, and auto-titling. |
-| **Persistent Job State** | Background ingestion tasks survive server reloads via a file-backed jobs store. |
-| **Power-User Slash Commands** | `/map` Mind Map view, `/split` side-by-side PDF viewer, `/zen` distraction-free mode, `/export` Markdown export. |
+| **Multi-Hop Knowledge Graph** | Extracts a relational graph of your document into MySQL, accessible visually and via AI tools. |
+| **Graph Centrality Analytics** | Calculates PageRank to physically scale node sizes based on their document-wide importance. |
+| **Interactive Ghost Drag UX** | Drag and drop visual graph nodes directly into the chat box to trigger advanced AI queries. |
+| **Agentic RAG (LangGraph)** | A cyclic LangGraph agent that decides when to search, trace connections, or answer. |
+| **Recursive CTE Engine** | AI utilizes advanced MySQL `WITH RECURSIVE` queries to deductively find paths between nodes. |
+| **Local Embeddings** | Uses `sentence-transformers` locally — zero API calls for embedding, zero quota usage. |
+| **Multi-Model Fallback** | Automatically retries across Gemini models with exponential backoff on 503/429 errors. |
+| **Multimodal OCR** | Supports PDFs and images via Gemini Vision OCR of text, tables, and charts. |
+| **Split-Screen Layout** | View the interactive Knowledge Graph side-by-side with your real-time chat history. |
 | **Voice Input** | Browser-native speech recognition for hands-free question entry. |
