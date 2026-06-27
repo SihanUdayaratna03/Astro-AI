@@ -11,6 +11,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Landing from './Landing';
 import BlurText from './BlurText';
 import MindMapView from './MindMapView';
+import { GraphView } from './GraphView';
 import './index.css';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -248,9 +249,11 @@ interface TopbarProps {
   onModelChange: (m: AstroModel) => void;
   onToggleStudyMode: () => void;
   isStudyMode: boolean;
+  onToggleKgMode: () => void;
+  isKgMode: boolean;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, selectedModel, onModelChange, onToggleStudyMode, isStudyMode }) => (
+const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, selectedModel, onModelChange, onToggleStudyMode, isStudyMode, onToggleKgMode, isKgMode }) => (
   <header className="topbar">
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <button
@@ -282,6 +285,15 @@ const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHis
       >
         <BookOpen size={15} />
         <span>Study Mode</span>
+      </button>
+      {/* Knowledge Graph toggle */}
+      <button
+        className={`topbar-action-btn ${isKgMode ? 'active' : ''}`}
+        onClick={onToggleKgMode}
+        title="Knowledge Graph"
+      >
+        <Database size={15} />
+        <span>Knowledge Graph</span>
       </button>
       {/* New Chat button */}
       <button
@@ -937,6 +949,7 @@ export default function App() {
 
   // ── Study Mode state ──────────────────────────────────────────────────────────
   const [isStudyMode, setIsStudyMode] = useState(false);
+  const [isKgMode, setIsKgMode] = useState(false);
   const [quizType, setQuizType] = useState('mcq');
   const [quizData, setQuizData] = useState<any>(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
@@ -1297,15 +1310,30 @@ export default function App() {
     }
   };
 
+  const handleNodeDrop = useCallback((node: any) => {
+    setInputValue(prev => {
+      const p = prev.trim();
+      if (p === '') {
+        return `How is ${node.name} connected to `;
+      } else if (p.includes('How is') && p.includes('connected to') && !p.includes('?')) {
+        return prev.replace(/ $/, '') + ` ${node.name}?`;
+      } else {
+        return prev + (prev.endsWith(' ') ? '' : ' ') + node.name;
+      }
+    });
+    // Give it a tiny delay to ensure state updates before focusing
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }, []);
+
   // ── Render helpers ───────────────────────────────────────────────────────────
   const showScanResult = activeTab === 'scan' && ocrText && (scanStatus === 'scanned' || scanStatus === 'ingesting' || scanStatus === 'ready');
   const showScanningAnim = activeTab === 'scan' && scanStatus === 'scanning' && scanFile;
   const hasMessages = messages.length > 0 || isQuerying;
-  const canSend = (canQuery && inputValue.trim().length > 0 && !isQuerying) || inputValue.trim().startsWith('/');
+  const canSend = (inputValue.trim().length > 0 && !isQuerying) || inputValue.trim().startsWith('/');
 
-  const inputPlaceholder = !canQuery
-    ? activeTab === 'pdf' ? 'Upload and ingest a PDF first...' : 'Scan an image first to enable Q&A...'
-    : activeTab === 'pdf' ? 'Ask a question about your document...' : 'Ask about the extracted image content...';
+  const inputPlaceholder = activeTab === 'pdf' 
+    ? 'Ask a question about your document...' 
+    : 'Ask about the extracted image content...';
 
   if (!hasStarted) {
     return <Landing onStart={() => setHasStarted(true)} />;
@@ -1329,7 +1357,9 @@ export default function App() {
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
           isStudyMode={isStudyMode}
-          onToggleStudyMode={() => setIsStudyMode(v => !v)}
+          onToggleStudyMode={() => { setIsStudyMode(v => !v); setIsKgMode(false); }}
+          isKgMode={isKgMode}
+          onToggleKgMode={() => { setIsKgMode(v => !v); setIsStudyMode(false); }}
         />
       )}
 
@@ -1405,6 +1435,25 @@ export default function App() {
                 hasDocument={!!(pdfFile || scanFile)}
               />
             </div>
+          ) : isKgMode ? (
+            <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden' }}>
+              <div style={{ flex: 2, overflow: 'hidden', position: 'relative', margin: '1rem', borderRadius: 8, border: '1px solid var(--border)' }}>
+                <GraphView onNodeDrop={handleNodeDrop} />
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border)' }}>
+                {hasMessages ? (
+                  <div className="messages-wrap" ref={messagesWrapRef} onScroll={handleScroll} style={{ flex: 1 }}>
+                    {messages.map(m => <MsgBubble key={m.id} msg={m} />)}
+                    {isQuerying && <TypingIndicator />}
+                    <div ref={messagesEndRef} />
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>
+                    <p>Drag and drop nodes from the graph here to ask questions about them.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : chatViewMode === 'graph' && hasMessages ? (
             <div style={{ flex: 1, overflow: 'hidden', position: 'relative', margin: '1rem', borderRadius: 8, border: '1px solid var(--border)' }}>
               <MindMapView messages={messages} />
@@ -1463,7 +1512,6 @@ export default function App() {
                     value={inputValue}
                     onChange={handleTextareaChange}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    disabled={!canQuery}
                     rows={1}
                   />
                   <button

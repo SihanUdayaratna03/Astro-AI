@@ -43,7 +43,103 @@ def calculate_expression(expression: str) -> str:
         return f"Error calculating: {e}"
 
 
-tools = [search_document, calculate_expression]
+@tool
+def query_knowledge_graph(entity_name: str) -> str:
+    """Queries the relational Knowledge Graph for all connections involving the given entity (e.g. person, organization).
+    Use this when answering questions about relationships, ownership, partnerships, or affiliations."""
+    try:
+        from app.core.db import SessionLocal
+        from app.models.graph import Entity, Relationship
+        from sqlalchemy import or_
+        
+        db = SessionLocal()
+        try:
+            # Find the entity
+            entity = db.query(Entity).filter(Entity.name.ilike(f"%{entity_name}%")).first()
+            if not entity:
+                return f"No information found for entity '{entity_name}' in the Knowledge Graph."
+                
+            # Find all relationships where this entity is source or target
+            rels = db.query(Relationship).filter(
+                or_(
+                    Relationship.source_entity_id == entity.id,
+                    Relationship.target_entity_id == entity.id
+                )
+            ).all()
+            
+            if not rels:
+                return f"Entity '{entity.name}' exists but has no known relationships."
+                
+            result_lines = [f"Knowledge Graph connections for '{entity.name}':"]
+            for r in rels:
+                src = r.source_entity.name
+                tgt = r.target_entity.name
+                result_lines.append(f"- [{src}] --({r.relationship_type})--> [{tgt}] : {r.description}")
+                
+            return "\n".join(result_lines)
+        finally:
+            db.close()
+    except Exception as e:
+        return f"Error querying Knowledge Graph: {e}"
+
+
+@tool
+def find_connection_path(entity1_name: str, entity2_name: str) -> str:
+    """Finds a multi-hop connection path between two entities in the Knowledge Graph.
+    Use this when you need to reason about how two seemingly unrelated concepts/people/companies are connected.
+    """
+    try:
+        from app.core.db import SessionLocal
+        from sqlalchemy import text
+        
+        db = SessionLocal()
+        try:
+            # Recursive CTE to find path (Breadth-First Search up to depth 4)
+            # Standard MySQL syntax.
+            query = text("""
+            WITH RECURSIVE GraphPaths AS (
+                SELECT 
+                    e.id AS current_node,
+                    CAST(e.name AS CHAR(1000)) AS path_string,
+                    1 AS depth
+                FROM entities e
+                WHERE e.name LIKE :start_name
+                
+                UNION ALL
+                
+                SELECT 
+                    CASE WHEN r.source_entity_id = gp.current_node THEN r.target_entity_id ELSE r.source_entity_id END,
+                    CONCAT(gp.path_string, ' -> ', e_next.name),
+                    gp.depth + 1
+                FROM GraphPaths gp
+                JOIN relationships r 
+                    ON r.source_entity_id = gp.current_node OR r.target_entity_id = gp.current_node
+                JOIN entities e_next 
+                    ON e_next.id = CASE WHEN r.source_entity_id = gp.current_node THEN r.target_entity_id ELSE r.source_entity_id END
+                WHERE gp.depth < 4
+                  AND INSTR(gp.path_string, e_next.name) = 0 -- Prevent cycles
+            )
+            SELECT path_string 
+            FROM GraphPaths 
+            WHERE current_node IN (SELECT id FROM entities WHERE name LIKE :end_name)
+            ORDER BY depth ASC
+            LIMIT 1;
+            """)
+            
+            result = db.execute(query, {"start_name": f"%{entity1_name}%", "end_name": f"%{entity2_name}%"}).fetchone()
+            
+            if result:
+                return f"Path found: {result[0]}"
+            else:
+                return f"No connection path found between '{entity1_name}' and '{entity2_name}' within 4 degrees of separation."
+                
+        finally:
+            db.close()
+    except Exception as e:
+        return f"Error finding connection path: {e}"
+
+
+tools = [search_document, calculate_expression, query_knowledge_graph, find_connection_path]
 tool_node = ToolNode(tools)
 
 # LangChain reads GOOGLE_API_KEY; map from GEMINI_API_KEY if needed

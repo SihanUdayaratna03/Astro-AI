@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+# Initialize database connections and create tables on startup
+import app.core.db
+
 logger = logging.getLogger("uvicorn")
 
 # ── File-backed job store (survives uvicorn --reload restarts) ──────────────
@@ -80,6 +83,17 @@ async def _ingest_document(job_id: str, file_path: str, source_id: str):
         await asyncio.to_thread(lambda: get_storage().upsert(ids, vecs, payloads))
 
         logger.info(f"[Job {job_id}] Done! Ingested {len(chunks)} chunks.")
+        
+        # --- Start Graph RAG extraction (Non-blocking) ---
+        try:
+            from app.services.graph_extractor import extract_and_save_graph
+            full_text = "\n\n".join(chunks)
+            # Fire and forget graph extraction
+            asyncio.create_task(asyncio.to_thread(extract_and_save_graph, full_text, source_id, source_id))
+        except Exception as ge:
+            logger.error(f"[Job {job_id}] Failed to trigger graph extraction: {ge}", exc_info=True)
+        # --- End Graph RAG extraction ---
+        
         _save_job(job_id, {
             "status": "completed",
             "output": {"ingested": len(chunks)},
@@ -100,6 +114,17 @@ async def _ingest_prechunked(job_id: str, chunks: list[str], source_id: str):
         count = await asyncio.to_thread(ingest_prechunked_chunks, chunks, source_id)
 
         logger.info(f"[Job {job_id}] Done! Ingested {count} chunks.")
+        
+        # --- Start Graph RAG extraction (Non-blocking) ---
+        try:
+            from app.services.graph_extractor import extract_and_save_graph
+            full_text = "\n\n".join(chunks)
+            # Fire and forget graph extraction
+            asyncio.create_task(asyncio.to_thread(extract_and_save_graph, full_text, source_id, source_id))
+        except Exception as ge:
+            logger.error(f"[Job {job_id}] Failed to trigger graph extraction: {ge}", exc_info=True)
+        # --- End Graph RAG extraction ---
+        
         _save_job(job_id, {
             "status": "completed",
             "output": {"ingested": count},
@@ -273,6 +298,40 @@ def get_job_status(job_id: str):
         return {"status": "failed", "error": job.get("error")}
     else:
         return {"status": status}
+
+
+@app.get("/api/graph")
+def get_graph_data():
+    """Returns all nodes and edges from the MySQL knowledge graph."""
+    from app.core.db import SessionLocal
+    from app.models.graph import Entity, Relationship
+    
+    db = SessionLocal()
+    try:
+        entities = db.query(Entity).all()
+        relationships = db.query(Relationship).all()
+        
+        nodes = [
+            {"id": e.id, "name": e.name, "group": e.entity_type, "description": e.description, "val": e.centrality_score}
+            for e in entities
+        ]
+        
+        links = [
+            {
+                "source": r.source_entity_id, 
+                "target": r.target_entity_id, 
+                "label": r.relationship_type,
+                "description": r.description
+            }
+            for r in relationships
+        ]
+        
+        return {"nodes": nodes, "links": links}
+    except Exception as e:
+        logger.error(f"Failed to fetch graph data: {e}")
+        return {"nodes": [], "links": []}
+    finally:
+        db.close()
 
 
 # ── OCR Scan endpoint ────────────────────────────────────────────────────────
