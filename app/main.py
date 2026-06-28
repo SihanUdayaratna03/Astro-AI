@@ -73,6 +73,12 @@ async def _ingest_document(job_id: str, file_path: str, source_id: str):
         else:
             raise ValueError(f"Unsupported file type: {file_path}")
 
+        if not chunks:
+            raise ValueError(
+                "No text could be extracted from this document. "
+                "If it's a scanned PDF, please try using the Photo Scan (Image OCR) feature instead."
+            )
+
         logger.info(f"[Job {job_id}] Loaded {len(chunks)} chunks, embedding...")
         vecs = await asyncio.to_thread(embed_texts, chunks)
 

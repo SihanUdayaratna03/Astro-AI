@@ -787,6 +787,20 @@ const StudyModeView: React.FC<{
   data: any;
   hasDocument: boolean;
 }> = ({ quizType, setQuizType, onGenerate, isLoading, error, data, hasDocument }) => {
+  const [mcqSelections, setMcqSelections] = useState<Record<number, number>>({});
+  const [tfSelections, setTfSelections] = useState<Record<number, boolean>>({});
+  const [flippedCards, setFlippedCards] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    setMcqSelections({});
+    setTfSelections({});
+    setFlippedCards({});
+  }, [data, quizType]);
+
+  const toggleFlashcard = (index: number) => {
+    setFlippedCards(prev => ({...prev, [index]: !prev[index]}));
+  };
+
   return (
     <div className="study-mode-container">
       <div className="study-header">
@@ -816,18 +830,39 @@ const StudyModeView: React.FC<{
         {data?.mcqs?.length > 0 && (
           <div className="study-section">
             <h3>Multiple Choice Questions</h3>
-            {data.mcqs.map((mcq: any, i: number) => (
-              <div key={i} className="study-card">
-                <div className="study-q"><strong>{i + 1}.</strong> {mcq.question}</div>
-                <div className="study-options">
-                  {mcq.options.map((opt: any, j: number) => (
-                    <div key={j} className={`study-opt ${opt.is_correct ? 'correct' : ''}`}>
-                      <span className="opt-letter">{['A','B','C','D'][j] || '-'}</span> {opt.text}
-                    </div>
-                  ))}
+            {data.mcqs.map((mcq: any, i: number) => {
+              const hasSelection = mcqSelections[i] !== undefined;
+              return (
+                <div key={i} className="study-card">
+                  <div className="study-q"><strong>{i + 1}.</strong> {mcq.question}</div>
+                  <div className="study-options">
+                    {mcq.options.map((opt: any, j: number) => {
+                      const isSelected = mcqSelections[i] === j;
+                      let className = 'study-opt';
+                      if (hasSelection) {
+                        if (opt.is_correct) className += ' correct';
+                        else if (isSelected) className += ' incorrect';
+                      }
+                      
+                      return (
+                        <div 
+                          key={j} 
+                          className={className}
+                          onClick={() => {
+                            if (!hasSelection) {
+                              setMcqSelections(prev => ({ ...prev, [i]: j }));
+                            }
+                          }}
+                          style={{ cursor: hasSelection ? 'default' : 'pointer' }}
+                        >
+                          <span className="opt-letter">{['A','B','C','D'][j] || '-'}</span> {opt.text}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -836,15 +871,19 @@ const StudyModeView: React.FC<{
             <h3>Flashcards</h3>
             <div className="flashcards-grid">
               {data.flashcards.map((fc: any, i: number) => (
-                <div key={i} className="flashcard">
+                <div 
+                  key={i} 
+                  className={`flashcard ${flippedCards[i] ? 'flipped' : ''}`}
+                  onClick={() => toggleFlashcard(i)}
+                >
                   <div className="flashcard-inner">
                     <div className="flashcard-front">
-                      <div className="fc-label">Q</div>
-                      {fc.front}
+                      <div className="fc-content">{fc.front}</div>
+                      <div className="fc-hint">Tap to flip</div>
                     </div>
                     <div className="flashcard-back">
-                      <div className="fc-label">A</div>
-                      {fc.back}
+                      <div className="fc-content">{fc.back}</div>
+                      <div className="fc-hint">Tap to flip back</div>
                     </div>
                   </div>
                 </div>
@@ -856,17 +895,45 @@ const StudyModeView: React.FC<{
         {data?.true_false?.length > 0 && (
           <div className="study-section">
             <h3>True / False Questions</h3>
-            {data.true_false.map((tf: any, i: number) => (
-              <div key={i} className="study-card">
-                <div className="study-q"><strong>{i + 1}.</strong> {tf.statement}</div>
-                <div className={`study-tf-badge ${tf.is_true ? 'true' : 'false'}`}>
-                  {tf.is_true ? 'True' : 'False'}
+            {data.true_false.map((tf: any, i: number) => {
+              const hasSelection = tfSelections[i] !== undefined;
+              const isSelectedTrue = tfSelections[i] === true;
+              const isSelectedFalse = tfSelections[i] === false;
+              
+              let trueClass = 'study-tf-btn';
+              let falseClass = 'study-tf-btn';
+              
+              if (hasSelection) {
+                if (tf.is_true) trueClass += ' correct';
+                else if (isSelectedTrue) trueClass += ' incorrect';
+                
+                if (!tf.is_true) falseClass += ' correct';
+                else if (isSelectedFalse) falseClass += ' incorrect';
+              }
+              
+              return (
+                <div key={i} className="study-card">
+                  <div className="study-q"><strong>{i + 1}.</strong> {tf.statement}</div>
+                  <div className="study-tf-actions">
+                    <button 
+                      className={trueClass} 
+                      onClick={() => !hasSelection && setTfSelections(prev => ({...prev, [i]: true}))}
+                      disabled={hasSelection}
+                    >True</button>
+                    <button 
+                      className={falseClass} 
+                      onClick={() => !hasSelection && setTfSelections(prev => ({...prev, [i]: false}))}
+                      disabled={hasSelection}
+                    >False</button>
+                  </div>
+                  {hasSelection && (
+                    <div className="study-explanation slide-down">
+                      <strong>Explanation:</strong> {tf.explanation}
+                    </div>
+                  )}
                 </div>
-                <div className="study-explanation">
-                  <strong>Explanation:</strong> {tf.explanation}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

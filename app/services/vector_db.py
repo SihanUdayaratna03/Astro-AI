@@ -14,6 +14,8 @@ class QdrantStorage:
             )
 
     def upsert(self, ids, vectors, payloads):
+        if not ids:
+            return
         points = [PointStruct(id=ids[i], vector=vectors[i], payload=payloads[i]) for i in range(len(ids))]
         self.client.upsert(self.collection, points=points)
 

@@ -2055,24 +2055,37 @@ body,
   align-items: center;
   gap: 0.75rem;
   font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.study-opt:hover:not(.correct):not(.incorrect) {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .study-opt.correct {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.15);
   border-color: #10b981;
   color: #10b981;
+}
+
+.study-opt.incorrect {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
 .opt-letter {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   background: rgba(255,255,255,0.05);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .study-opt.correct .opt-letter {
@@ -2080,32 +2093,69 @@ body,
   color: #fff;
 }
 
-.study-tf-badge {
-  display: inline-flex;
-  padding: 0.25rem 0.75rem;
-  border-radius: 99px;
-  font-size: 0.85rem;
-  font-weight: 600;
+.study-opt.incorrect .opt-letter {
+  background: #ef4444;
+  color: #fff;
+}
+
+.study-tf-actions {
+  display: flex;
+  gap: 1rem;
   margin-bottom: 1rem;
 }
 
-.study-tf-badge.true {
+.study-tf-btn {
+  flex: 1;
+  padding: 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.study-tf-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.study-tf-btn:disabled {
+  cursor: default;
+}
+
+.study-tf-btn.correct {
   background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
   color: #10b981;
 }
 
-.study-tf-badge.false {
+.study-tf-btn.incorrect {
   background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
   color: #ef4444;
 }
 
 .study-explanation {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--text-secondary);
-  line-height: 1.5;
-  background: rgba(255,255,255,0.02);
-  padding: 1rem;
-  border-radius: 6px;
+  line-height: 1.6;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--accent);
+  padding: 1rem 1.25rem;
+  border-radius: 0 8px 8px 0;
+  margin-top: 1rem;
+}
+
+.slide-down {
+  animation: slide-down 0.3s ease-out forwards;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Flashcards Grid */
@@ -2116,7 +2166,7 @@ body,
 }
 
 .flashcard {
-  height: 200px;
+  height: 220px;
   perspective: 1000px;
   cursor: pointer;
 }
@@ -2129,7 +2179,7 @@ body,
   transform-style: preserve-3d;
 }
 
-.flashcard:hover .flashcard-inner {
+.flashcard.flipped .flashcard-inner {
   transform: rotateY(180deg);
 }
 
@@ -2142,31 +2192,40 @@ body,
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 1.5rem;
+  padding: 2rem;
   text-align: center;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-  font-size: 1.05rem;
-  line-height: 1.4;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  font-size: 1.1rem;
+  line-height: 1.5;
 }
 
 .flashcard-front {
-  background: linear-gradient(145deg, var(--card-bg), var(--bg));
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
   color: var(--text-primary);
 }
 
 .flashcard-back {
-  background: linear-gradient(145deg, var(--accent), #3a78f2);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #2563eb);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
   transform: rotateY(180deg);
-  border: none;
 }
 
-.fc-label {
+.fc-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fc-hint {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  opacity: 0.5;
-  margin-bottom: 0.75rem;
+  opacity: 0.4;
+  margin-top: 1rem;
+  font-family: var(--font-mono);
 }
