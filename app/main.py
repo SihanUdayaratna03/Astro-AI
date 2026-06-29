@@ -47,6 +47,10 @@ def _get_job(job_id: str) -> dict | None:
 # ── FastAPI app ─────────────────────────────────────────────────────────────
 app = FastAPI()
 
+# Add our multi-tenant security layer
+from app.core.security import MultiTenantSecurityMiddleware
+app.add_middleware(MultiTenantSecurityMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -54,6 +58,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from pydantic import BaseModel
+from app.core.auth import create_user, get_user, verify_password, get_password_hash, create_access_token
+
+class UserAuth(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/register")
+def register(user: UserAuth):
+    from fastapi import HTTPException
+    import uuid
+    # Create a unique tenant_id for this user
+    tenant_id = f"tenant_{user.username}_{uuid.uuid4().hex[:8]}"
+    pwd_hash = get_password_hash(user.password)
+    success = create_user(user.username, pwd_hash, tenant_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    return {"message": "User created successfully"}
+
+@app.post("/api/login")
+def login(user: UserAuth):
+    from fastapi import HTTPException
+    db_user = get_user(user.username)
+    if not db_user or not verify_password(user.password, db_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    
+    access_token = create_access_token(
+        data={"sub": db_user["username"], "tenant_id": db_user["tenant_id"]}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # ── Background task: ingest a document (PDF or image) ──────────────────────
@@ -237,8 +272,33 @@ class QuizRequest(BaseModel):
     quiz_type: str = "mcq"  # 'mcq', 'flashcards', 'true_false', or 'all'
     model: str = DEFAULT_ASTRO_MODEL
 
+class AuthRequest(BaseModel):
+    username: str
+    password: str
 
 # ── Routes ───────────────────────────────────────────────────────────────────
+
+@app.post("/api/register")
+async def register(req: AuthRequest):
+    from app.core.auth import create_user, get_password_hash
+    if not req.username or not req.password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+    # Use username as tenant_id for simplicity and isolation
+    success = create_user(req.username, get_password_hash(req.password), req.username)
+    if not success:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    return {"message": "User registered successfully"}
+
+@app.post("/api/login")
+async def login(req: AuthRequest):
+    from app.core.auth import get_user, verify_password, create_access_token
+    user = get_user(req.username)
+    if not user or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    token = create_access_token({"sub": user["username"], "tenant_id": user["tenant_id"]})
+    return {"access_token": token, "token_type": "bearer", "tenant_id": user["tenant_id"]}
+
 
 @app.post("/api/generate-quiz")
 async def generate_quiz(req: QuizRequest, background_tasks: BackgroundTasks):

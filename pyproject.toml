@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "bcrypt>=5.0.0",
     "fastapi>=0.136.3",
     "google-genai>=2.8.0",
     "inngest>=0.5.18",
@@ -15,6 +16,8 @@ dependencies = [
     "llama-index-readers-file>=0.6.0",
     "networkx>=3.6.1",
     "openai>=2.41.0",
+    "passlib>=1.7.4",
+    "pyjwt>=2.13.0",
     "pymysql>=1.2.0",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.32",

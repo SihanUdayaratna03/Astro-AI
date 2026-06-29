@@ -12,6 +12,7 @@ import Landing from './Landing';
 import BlurText from './BlurText';
 import MindMapView from './MindMapView';
 import { GraphView } from './GraphView';
+import Login from './Login';
 import './index.css';
 import FeaturesSection from './FeaturesSection';
 
@@ -139,7 +140,10 @@ async function pollStatus(eventId: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const iv = setInterval(async () => {
       try {
-        const r = await fetch(`${API}/status/${eventId}`);
+        const token = localStorage.getItem('token');
+        const r = await fetch(`${API}/status/${eventId}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         if (!r.ok) {
            clearInterval(iv);
            reject(new Error(`Server error: ${r.status}`));
@@ -946,6 +950,7 @@ const StudyModeView: React.FC<{
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('token'));
   const [hasStarted, setHasStarted] = useState(false);
 
   // ── Selected Astro AI model (persists in localStorage) ────────────────────
@@ -1197,7 +1202,12 @@ export default function App() {
     setPdfStatus('uploading'); setPdfMsg('Uploading PDF...');
     const fd = new FormData(); fd.append('file', pdfFile);
     try {
-      const res = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/upload`, { 
+        method: 'POST', 
+        body: fd,
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Upload failed'); }
       const data = await res.json();
       setPdfStatus('processing'); setPdfMsg('Extracting text and generating embeddings...');
@@ -1239,7 +1249,12 @@ export default function App() {
     setScanStatus('scanning'); setScanMsg('Gemini Vision is scanning the image...');
     const fd = new FormData(); fd.append('file', scanFile.file);
     try {
-      const res = await fetch(`${API}/ocr-scan`, { method: 'POST', body: fd });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/ocr-scan`, { 
+        method: 'POST', 
+        body: fd,
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'OCR failed'); }
       const data = await res.json();
       setOcrText(data.extracted_text); setOcrCharCount(data.char_count);
@@ -1287,9 +1302,13 @@ export default function App() {
     setQuizData(null);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/generate-quiz`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ filename, quiz_type: quizType, model: selectedModel.id })
       });
       if (!res.ok) {
@@ -1360,8 +1379,12 @@ export default function App() {
     setIsQuerying(true);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/query`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ question: q, model: selectedModel.id }),
       });
       if (!res.ok) throw new Error('Query failed');
@@ -1401,6 +1424,13 @@ export default function App() {
   const inputPlaceholder = activeTab === 'pdf' 
     ? 'Ask a question about your document...' 
     : 'Ask about the extracted image content...';
+
+  if (!authToken) {
+    return <Login onLoginSuccess={(token) => {
+      localStorage.setItem('token', token);
+      setAuthToken(token);
+    }} />;
+  }
 
   if (!hasStarted) {
     return (
@@ -1474,6 +1504,20 @@ export default function App() {
                   onDragOver={scanDragOver} onDragLeave={scanDragLeave} onDrop={scanDrop}
                 />
               )}
+            </div>
+            
+            <div style={{ padding: '1rem', borderTop: '1px solid var(--border)' }}>
+              <button 
+                className="btn-danger" 
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,50,50,0.1)', color: 'rgba(255,90,90,0.9)', border: '1px solid rgba(255,90,90,0.3)', cursor: 'pointer' }}
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  setAuthToken(null);
+                  setHasStarted(false);
+                }}
+              >
+                Sign Out Workspace
+              </button>
             </div>
           </aside>
         )}

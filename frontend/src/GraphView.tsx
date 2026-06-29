@@ -41,7 +41,10 @@ export function GraphView({ onNodeDrop }: GraphViewProps) {
   }, []);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/graph')
+    const token = localStorage.getItem('token');
+    fetch('http://127.0.0.1:8000/api/graph', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch graph data');
         return res.json();
