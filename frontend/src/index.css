@@ -74,77 +74,106 @@ body,
 }
 
 /* ΓòÉΓòÉ STARFIELD ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */
-.starfield {
+/* ════ ABSTRACT GEOMETRIC POLYGON BACKGROUND ════ */
+.poly-bg-wrapper {
   position: fixed;
   inset: 0;
-  pointer-events: none;
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
-  background-image:
-    radial-gradient(0.8px 0.8px at 8% 12%, rgba(255, 255, 255, .50) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 22% 38%, rgba(255, 255, 255, .35) 0%, transparent 100%),
-    radial-gradient(1.0px 1.0px at 37% 6%, rgba(255, 255, 255, .45) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 51% 62%, rgba(255, 255, 255, .30) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 67% 22%, rgba(255, 255, 255, .50) 0%, transparent 100%),
-    radial-gradient(1.0px 1.0px at 79% 78%, rgba(255, 255, 255, .35) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 91% 44%, rgba(255, 255, 255, .45) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 13% 82%, rgba(255, 255, 255, .30) 0%, transparent 100%),
-    radial-gradient(1.0px 1.0px at 33% 55%, rgba(255, 255, 255, .40) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 74% 9%, rgba(255, 255, 255, .35) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 49% 33%, rgba(255, 255, 255, .50) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 16% 50%, rgba(255, 255, 255, .40) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 63% 50%, rgba(255, 255, 255, .20) 0%, transparent 100%),
-    radial-gradient(0.8px 0.8px at 94% 82%, rgba(255, 255, 255, .35) 0%, transparent 100%);
-  animation: star-pulse 8s ease-in-out infinite alternate;
+  /* Pitch black to perfectly match the dashboard EXACTLY */
+  background: #000000; 
+  overflow: hidden;
 }
 
-@keyframes star-pulse {
-  0% {
-    opacity: .6;
-  }
-
-  100% {
-    opacity: 1;
-  }
+/* Subtle cyan flare in the bottom left */
+.poly-glow {
+  position: absolute;
+  bottom: -30vh;
+  left: -20vw;
+  width: 100vw;
+  height: 100vw;
+  background: radial-gradient(circle at center, rgba(56, 189, 248, 0.05) 0%, transparent 50%);
+  z-index: 1;
 }
 
-.shooting-star {
-  position: fixed;
-  top: 22%;
-  left: -300px;
-  width: 250px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, .6) 50%, transparent 100%);
-  transform: rotate(-18deg);
-  animation: shooting 14s linear infinite;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0;
+.poly-shape {
+  position: absolute;
+  z-index: 2;
+  /* Very slow, elegant, breathing shift */
+  animation: poly-shift 25s infinite alternate ease-in-out;
+  /* Use wireframes instead of fills so the #000000 background is completely unadulterated */
+  background: transparent !important;
 }
 
-@keyframes shooting {
-  0% {
-    left: -300px;
-    opacity: 0
-  }
+/* Layer 1: Elegant large overlay from the left */
+.poly-1 {
+  width: 150vw;
+  height: 150vh;
+  top: -50vh;
+  left: -20vw;
+  border: 1px solid rgba(56, 189, 248, 0.20);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.08), inset 0 0 15px rgba(56, 189, 248, 0.08);
+  --r: -15deg;
+  transform: rotate(var(--r));
+  animation-delay: 0s;
+}
 
-  3% {
-    opacity: .7
-  }
+/* Layer 2: Subtle intersection from the right */
+.poly-2 {
+  width: 120vw;
+  height: 100vh;
+  bottom: -20vh;
+  right: -30vw;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.08), inset 0 0 15px rgba(37, 99, 235, 0.08);
+  --r: 25deg;
+  transform: rotate(var(--r));
+  animation-delay: -5s;
+}
 
-  35% {
-    opacity: .5
-  }
+/* Layer 3: Faint translucent slice */
+.poly-3 {
+  width: 200vw;
+  height: 100vh;
+  top: 10vh;
+  left: -50vw;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.05), inset 0 0 10px rgba(56, 189, 248, 0.05);
+  --r: -5deg;
+  transform: rotate(var(--r));
+  animation-delay: -10s;
+}
 
-  50% {
-    opacity: 0;
-    left: 110vw
-  }
+/* Layer 4: Diagonal beam from top left */
+.poly-4 {
+  width: 100vw;
+  height: 150vh;
+  top: -20vh;
+  left: 20vw;
+  border: 1px solid rgba(37, 99, 235, 0.20);
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.08), inset 0 0 15px rgba(37, 99, 235, 0.08);
+  --r: 45deg;
+  transform: rotate(var(--r));
+  animation-delay: -15s;
+}
 
-  51%,
-  100% {
-    left: 110vw;
-    opacity: 0
-  }
+/* Layer 5: Brightest intersection near bottom */
+.poly-5 {
+  width: 150vw;
+  height: 50vh;
+  bottom: 0;
+  left: -20vw;
+  border: 1px solid rgba(56, 189, 248, 0.30);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.1), inset 0 0 20px rgba(56, 189, 248, 0.1);
+  --r: -25deg;
+  transform: rotate(var(--r));
+  animation-delay: -20s;
+}
+
+@keyframes poly-shift {
+  0% { transform: rotate(var(--r)) translate(0, 0) scale(1); }
+  100% { transform: rotate(var(--r)) translate(3vw, 3vh) scale(1.05); }
 }
 
 /* ΓòÉΓòÉ TOPBAR ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */

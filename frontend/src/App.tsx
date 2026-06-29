@@ -254,7 +254,7 @@ interface TopbarProps {
   isKgMode: boolean;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, selectedModel, onModelChange, onToggleStudyMode, isStudyMode, onToggleKgMode, isKgMode }) => (
+const Topbar: React.FC<TopbarProps> = ({ onBackToLanding, onNewChat, onToggleHistory, historyOpen, onToggleStudyMode, isStudyMode, onToggleKgMode, isKgMode }) => (
   <header className="topbar">
     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
       <button
@@ -1354,7 +1354,6 @@ export default function App() {
     // Always scroll to bottom when user deliberately sends a message
     isNearBottomRef.current = true;
     const userMsg: Message = { id: `${Date.now()}`, role: 'user', content: q };
-    const isFirstMessage = messages.length === 0;
     updateConversationMessages(activeConversationId, prev => [...prev, userMsg], true);
     setInputValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';

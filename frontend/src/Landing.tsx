@@ -9,11 +9,15 @@ interface LandingProps {
 const Landing: React.FC<LandingProps> = ({ onStart }) => {
   return (
     <div className="landing-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw', textAlign: 'center' }}>
-      {/* Background space effects */}
-      <div className="starfield" />
-      <div className="shooting-star" />
-      <div className="glow-orb top-left" />
-      <div className="glow-orb bottom-right" />
+      {/* Abstract Geometric Polygon Background */}
+      <div className="poly-bg-wrapper">
+        <div className="poly-glow" />
+        <div className="poly-shape poly-1" />
+        <div className="poly-shape poly-2" />
+        <div className="poly-shape poly-3" />
+        <div className="poly-shape poly-4" />
+        <div className="poly-shape poly-5" />
+      </div>
 
       {/* Main Content */}
       <main className="landing-main" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: 'auto' }}>
