@@ -59,6 +59,10 @@ def generate_quiz_from_chunks(chunks: list[str], quiz_type: str, astro_model: st
 You are an expert educator. Based on the following document context, generate a study guide.
 {type_instructions}
 
+CRITICAL RANDOMIZATION RULES:
+- For MCQs: Randomly distribute the correct answers across all options. Do not always make the same option (like C) the correct one.
+- For True/False questions: Randomize whether the statement is True or False. Do not make all statements True or all statements False. Ensure a balanced mix of both True and False answers.
+
 Ensure the questions are accurate and directly based on the provided text.
 
 Context:
