@@ -13,6 +13,7 @@ import BlurText from './BlurText';
 import MindMapView from './MindMapView';
 import { GraphView } from './GraphView';
 import './index.css';
+import FeaturesSection from './FeaturesSection';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -1403,7 +1404,18 @@ export default function App() {
     : 'Ask about the extracted image content...';
 
   if (!hasStarted) {
-    return <Landing onStart={() => setHasStarted(true)} />;
+    return (
+      <div style={{ height: '100vh', width: '100vw', overflowY: 'auto', overflowX: 'hidden' }}>
+        <div style={{ position: 'relative', height: '100vh', width: '100vw' }}>
+          <Landing onStart={() => setHasStarted(true)} />
+          <div className="scroll-indicator" style={{ position: 'absolute', bottom: '6rem', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', opacity: 0.6, color: '#b0bcd0', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', pointerEvents: 'none', zIndex: 10 }}>
+             <span>Scroll to explore</span>
+             <div className="scroll-arrow" style={{ width: '12px', height: '12px', borderRight: '2px solid #b0bcd0', borderBottom: '2px solid #b0bcd0', transform: 'rotate(45deg)' }}></div>
+          </div>
+        </div>
+        <FeaturesSection />
+      </div>
+    );
   }
 
   return (
