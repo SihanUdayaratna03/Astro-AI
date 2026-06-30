@@ -2,15 +2,17 @@
 
 ![Welcome to Astro AI](screenshot.png)
 
-**Astro AI** is an intelligent document assistant built with **React**, **FastAPI**, **LangGraph**, **sentence-transformers**, **Qdrant**, **MySQL**, and the **Google Gemini API**. Upload a PDF or image, and instantly ask questions about it using natural language. Astro AI retrieves the most relevant context from your documents and generates precise, source-grounded answers. 
+**Traditional RAG is excellent at finding relevant passages. But what happens when the answer is spread across an entire document?** That's where most systems break down.
 
-Beyond standard RAG, Astro AI automatically extracts a **Multi-Hop Knowledge Graph** from your documents, computes PageRank centrality, and empowers the AI to deductively trace hidden connections between concepts using advanced Recursive SQL queries.
+**Astro AI** is a next-generation intelligent document assistant built with **React**, **FastAPI**, **LangGraph**, **sentence-transformers**, **Qdrant**, **MySQL**, and the **Google Gemini API**. It bridges the gap between semantic search and deductive reasoning. 
+
+Instead of just retrieving text chunks, Astro AI automatically extracts a **Multi-Hop Knowledge Graph** from your documents, computes PageRank centrality, and empowers an autonomous AI agent to deductively trace hidden connections between concepts using advanced Recursive SQL queries.
 
 ---
 
 ## Architecture
 
-The system uses Python's asynchronous background tasks for reliable processing. Embeddings are kept fully local to avoid API quota costs, while complex entity extraction relies on Gemini.
+Astro AI leverages a highly scalable full-stack architecture. Embeddings are kept fully local to avoid API quota costs, while complex entity extraction and autonomous reasoning rely on LangGraph and the Gemini API.
 
 ```mermaid
 graph TD
@@ -19,6 +21,7 @@ graph TD
     classDef localAI fill:#f39c12,stroke:#fff,stroke-width:2px,color:#fff
     classDef extAPI fill:#4285f4,stroke:#fff,stroke-width:2px,color:#fff
     classDef database fill:#673ab7,stroke:#fff,stroke-width:2px,color:#fff
+    classDef agent fill:#34495e,stroke:#fff,stroke-width:2px,color:#fff
 
     UI[React Frontend]:::frontend
     API[FastAPI Backend]:::backend
@@ -26,11 +29,12 @@ graph TD
     Qdrant[(Qdrant Vector DB)]:::database
     MySQL[(MySQL Graph DB)]:::database
     Gemini[Google Gemini API]:::extAPI
+    LangGraph[LangGraph Autonomous Agent]:::agent
 
-    UI -- "1. Upload PDF/Image" --> API
+    UI -- "1. Upload Document" --> API
     UI -- "1b. Poll Status" --> API
 
-    subgraph FastAPI Background Tasks
+    subgraph FastAPI Background Ingestion Phase
         API -- "Extract Text & Chunk" --> Chunking[Sentence Splitter]
         Chunking -- "Generate Vectors" --> SentenceTransformer
         SentenceTransformer -- "Save Vectors" --> Qdrant
@@ -40,15 +44,17 @@ graph TD
         NetworkX -- "Save Nodes, Edges, Scores" --> MySQL
     end
 
-    subgraph Search Phase
-        API -- "Search Query" --> SentenceTransformer
-        SentenceTransformer -- "Find Nearest Chunks" --> Qdrant
-        Qdrant -- "Return Context" --> API
-        API -- "Prompt with Context" --> Gemini
+    subgraph Agentic Reasoning Phase
+        UI -- "2. User Query" --> API
+        API -- "Initialize State" --> LangGraph
+        LangGraph -- "Plan & Route" --> Gemini
+        LangGraph -- "search_document tool" --> Qdrant
+        LangGraph -- "find_connection_path tool" --> MySQL
+        LangGraph -- "calculate_expression tool" --> Math[Local Python Math]:::localAI
     end
 
-    Gemini -- "Return Answer" --> API
-    API -- "Return Answer and Sources" --> UI
+    LangGraph -- "Synthesize Answer & Sources" --> API
+    API -- "Return to User" --> UI
 ```
 
 ---
@@ -118,14 +124,15 @@ Astro AI uses a named model tier system. Each tier maps to an underlying Gemini 
 
 ---
 
-## Advanced Features: Multi-Hop Knowledge Graph
+## Advanced Features
 
-Astro AI doesn't just read your text; it maps the relationships inside it.
+Astro AI doesn't just read your text; it maps the relationships inside it and lets you interact with them.
 
-1. **Entity Extraction**: During ingestion, Gemini extracts core entities (People, Organizations, Concepts) and their relationships.
-2. **PageRank Centrality Analytics**: Using `networkx`, the backend computes a PageRank centrality score for every node to determine its global importance within the document.
-3. **Visual Split-View**: The frontend renders this graph dynamically using `react-force-graph-2d`. Highly central nodes are physically larger, allowing you to instantly spot the most important concepts.
-4. **Ghost Drag UX**: You can drag nodes directly off the canvas and drop them into the persistent chat bar! Dropping two nodes automatically constructs a Multi-Hop query for the LangGraph agent.
+1. **Multi-Hop Knowledge Graph & PageRank**: During ingestion, Gemini extracts core entities and relationships. The backend uses `networkx` to calculate PageRank centrality, determining global importance. Highly central nodes appear physically larger in the dynamic React visualization!
+2. **Interactive "Ghost Drag" UX**: Want to connect concepts? Drag and drop visual graph nodes from the canvas directly into the chat box. Dropping two nodes automatically constructs an advanced Multi-Hop query for the AI, acting like a digital whiteboard.
+3. **Agentic RAG via LangGraph**: The AI autonomously decides whether to search Qdrant for text context or execute complex graph traversal against MySQL.
+4. **Self-Healing Fallback**: Built for reliability, the system tracks model tiers (Nova, Pulsar, Quasar) and automatically retries with exponential backoff if it hits API rate limits.
+5. **Multimodal OCR & Voice Input**: Seamlessly process PDFs and images via Gemini Vision, and interact hands-free using browser-native speech recognition.
 
 ---
 
